@@ -15,6 +15,7 @@ class CursoForm(EstiloTailwindMixin, forms.ModelForm):
             "carga_horaria",
             "valor",
             "frequencia_minima",
+            "parcelas_max",
             "descricao",
             "pre_requisitos",
             "ativo",

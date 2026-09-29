@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Registrar pagamento · Cursos Livres{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-2xl">
+  <a href="{{ voltar_url }}" class="text-sm text-indigo-700 hover:underline">← Voltar</a>
+  <h1 class="mt-2 mb-4 text-2xl font-semibold">Registrar pagamento</h1>
+  {% include "financeiro/_resumo_parcela.html" %}
+  <form method="post" class="mt-4 rounded-lg bg-white p-4 shadow sm:p-6" novalidate>
+    {% csrf_token %}
+    <input type="hidden" name="next" value="{{ voltar_url }}">
+    {% include "partials/formulario.html" %}
+    <div class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+      <a href="{{ voltar_url }}" class="rounded px-4 py-2 text-center ring-1 ring-slate-300 hover:bg-slate-50">Cancelar</a>
+      <button class="rounded bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800">Confirmar pagamento integral</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

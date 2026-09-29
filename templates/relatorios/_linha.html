@@ -6,6 +6,8 @@
         <td class="whitespace-nowrap px-3 py-2">{{ valor }}</td>
       {% elif tipo == "numero" %}
         <td class="px-3 py-2 text-right tabular-nums">{{ valor }}</td>
+      {% elif tipo == "moeda" %}
+        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums">{{ valor|reais }}</td>
       {% elif tipo == "pct" %}
         <td class="px-3 py-2 text-right tabular-nums">{{ valor|percentual }}</td>
       {% else %}

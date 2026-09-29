@@ -34,7 +34,16 @@
             <input type="checkbox" name="presente" value="{{ matricula.pk }}"
                    class="presenca h-6 w-6 shrink-0 rounded border-slate-300 accent-green-600"
                    {% if frequencia.presente %}checked{% endif %} {% if encerrada %}disabled{% endif %}>
-            <span class="flex-1 font-medium">{{ matricula.aluno.nome }}</span>
+            <span class="flex-1 font-medium">
+              {{ matricula.aluno.nome }}
+              {% with situacao=situacoes|valor_de:matricula.pk %}
+                {% if situacao.alerta %}
+                  <span class="mt-0.5 block text-xs font-normal {% if situacao.codigo == 'inadimplente' %}text-red-700{% else %}text-amber-700{% endif %}">
+                    {% if situacao.codigo == "inadimplente" %}⚠{% else %}!{% endif %} Pagamento pendente – procure a secretaria
+                  </span>
+                {% endif %}
+              {% endwith %}
+            </span>
             <span class="text-xs text-slate-500" title="Frequência até hoje">{{ frequencias|valor_de:matricula.pk|percentual }}</span>
           </label>
           <input type="text" name="obs_{{ matricula.pk }}" value="{{ frequencia.observacao|default:'' }}" maxlength="255"

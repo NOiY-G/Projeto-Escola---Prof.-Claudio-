@@ -30,11 +30,11 @@ título e subtítulo; os números, uma grade de rótulo/valor; o medidor, uma ba
 
   <dl class="mt-3 grid grid-cols-3 gap-x-3 gap-y-2">
     {% for chave, titulo, tipo in relatorio.colunas %}
-      {% if tipo == "numero" or tipo == "pct" %}
+      {% if tipo == "numero" or tipo == "pct" or tipo == "moeda" %}
         {% with valor=linha|valor_de:chave %}
           <div>
             <dt class="text-xs text-slate-500">{{ titulo }}</dt>
-            <dd class="tabular-nums">{% if tipo == "pct" %}{{ valor|percentual }}{% else %}{{ valor }}{% endif %}</dd>
+            <dd class="tabular-nums">{% if tipo == "pct" %}{{ valor|percentual }}{% elif tipo == "moeda" %}{{ valor|reais }}{% else %}{{ valor }}{% endif %}</dd>
           </div>
         {% endwith %}
       {% endif %}

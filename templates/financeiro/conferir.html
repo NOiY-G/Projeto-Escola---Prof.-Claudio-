@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Conferir comprovante · Cursos Livres{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-4xl">
+  <a href="{% url 'financeiro:pagamentos' %}?ver=comprovantes" class="text-sm text-indigo-700 hover:underline">← Comprovantes para conferir</a>
+  <h1 class="mt-2 mb-1 text-2xl font-semibold">Conferir comprovante</h1>
+  <p class="mb-4 text-sm text-slate-600">
+    Enviado em {{ comprovante.enviado_em|date:"d/m/Y H:i" }}. Confira no extrato do banco se o Pix caiu
+    <strong>com o valor certo</strong> antes de confirmar: o comprovante sozinho não garante o pagamento.
+  </p>
+
+  <div class="grid gap-6 lg:grid-cols-2">
+    <div class="overflow-hidden rounded-lg bg-white p-2 shadow">
+      {% url 'financeiro:arquivo_comprovante' comprovante.pk as url_arquivo %}
+      {% if comprovante.tipo_conteudo == "application/pdf" %}
+        <p class="p-4 text-center"><a href="{{ url_arquivo }}" target="_blank" rel="noopener" class="text-indigo-700 underline">Abrir o comprovante (PDF)</a></p>
+      {% else %}
+        <a href="{{ url_arquivo }}" target="_blank" rel="noopener"><img src="{{ url_arquivo }}" alt="Comprovante enviado pelo aluno" class="mx-auto max-h-[70vh] w-auto"></a>
+      {% endif %}
+    </div>
+
+    <div class="space-y-4">
+      {% include "financeiro/_resumo_parcela.html" %}
+      {% if comprovante.status == "em_analise" %}
+        <form method="post" class="rounded-lg bg-white p-4 shadow" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="acao" value="aprovar">
+          <h2 class="mb-3 font-semibold text-green-800">O Pix caiu na conta</h2>
+          {% include "partials/formulario.html" with form=aprovar uma_coluna=True %}
+          <button class="mt-4 w-full rounded bg-green-700 px-4 py-2 font-medium text-white hover:bg-green-800">Confirmar pagamento</button>
+        </form>
+        <form method="post" class="rounded-lg bg-white p-4 shadow" novalidate>
+          {% csrf_token %}
+          <input type="hidden" name="acao" value="recusar">
+          <h2 class="mb-3 font-semibold text-red-800">Não encontrei o Pix / há algo errado</h2>
+          {% include "partials/formulario.html" with form=recusar uma_coluna=True %}
+          <p class="mt-1 text-xs text-slate-500">O aluno vai ver este motivo e poderá enviar outro comprovante.</p>
+          <button class="mt-4 w-full rounded px-4 py-2 text-red-800 ring-1 ring-red-300 hover:bg-red-50">Recusar comprovante</button>
+        </form>
+      {% else %}
+        <p class="rounded-lg bg-slate-100 p-4 text-slate-700">Este comprovante já foi {{ comprovante.get_status_display|lower }}.</p>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

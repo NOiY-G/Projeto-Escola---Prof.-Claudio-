@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% load formatos %}
+{% block title %}Pagamentos · Cursos Livres{% endblock %}
+{% block content %}
+<h1 class="mb-3 text-2xl font-semibold">Pagamentos</h1>
+
+<nav class="mb-3 flex flex-wrap gap-2" aria-label="Filtros">
+  {% for chave, rotulo in filtros.items %}
+    <a href="?ver={{ chave }}{% if request.GET.q %}&q={{ request.GET.q|urlencode }}{% endif %}"
+       class="rounded-full px-3 py-1.5 text-sm {% if chave == filtro %}bg-indigo-700 text-white{% else %}bg-white ring-1 ring-slate-300 hover:bg-slate-50{% endif %}"
+       {% if chave == filtro %}aria-current="page"{% endif %}>
+      {{ rotulo }}{% if chave == "comprovantes" and em_analise %} ({{ em_analise }}){% endif %}
+    </a>
+  {% endfor %}
+</nav>
+
+<form method="get" class="mb-4 flex flex-col gap-2 sm:flex-row">
+  <input type="hidden" name="ver" value="{{ filtro }}">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Buscar aluno por nome ou CPF"
+         class="flex-1 rounded border border-slate-300 px-3 py-2">
+  <button class="rounded px-4 py-2 ring-1 ring-slate-300 hover:bg-white">Buscar</button>
+</form>
+
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for parcela in parcelas %}
+      <li class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <a href="{% url 'alunos:aluno_detalhe' parcela.matricula.aluno_id %}" class="font-medium hover:underline">{{ parcela.matricula.aluno.nome }}</a>
+          {% include "financeiro/_situacao.html" with situacao=parcela.situacao so_alerta=True %}
+          <p class="text-sm text-slate-600">
+            {{ parcela.matricula.turma.curso.nome }} ({{ parcela.matricula.turma.codigo }}) ·
+            parcela {{ parcela.numero }} · <strong class="text-slate-800">{{ parcela.valor|reais }}</strong> ·
+            vence {{ parcela.vencimento|date:"d/m/Y" }}
+          </p>
+          <p class="text-xs text-slate-500">Identificador no Pix: {{ parcela.identificador }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-2">
+          {% include "financeiro/_status_parcela.html" %}
+          {% if parcela.status == "em_analise" %}
+            <a href="{% url 'financeiro:conferir' parcela.comprovantes.first.pk %}"
+               class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">Conferir comprovante</a>
+          {% elif parcela.status == "aberta" %}
+            <a href="{% url 'financeiro:registrar' parcela.pk %}?next={{ request.get_full_path|urlencode }}"
+               class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">Registrar pagamento</a>
+          {% endif %}
+        </div>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhuma parcela neste filtro.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

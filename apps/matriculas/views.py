@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib import messages
 from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
@@ -8,6 +9,8 @@ from django.views.decorators.http import require_POST
 
 from apps.contas.decorators import perfil_requerido
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO, PERFIL_INSTRUTOR
+from apps.financeiro import services as financeiro
+from apps.financeiro.forms import ComprovanteForm
 from apps.turmas import services as turmas_services
 from apps.turmas.models import Turma
 
@@ -31,7 +34,12 @@ def matricula_nova(request):
         if form.is_valid():
             turma = form.cleaned_data["turma"]
             try:
-                matricula = services.matricular(form.cleaned_data["aluno"], turma)
+                matricula = services.matricular(
+                    form.cleaned_data["aluno"],
+                    turma,
+                    n_parcelas=form.cleaned_data["n_parcelas"],
+                    desconto=form.cleaned_data["desconto"],
+                )
             except services.MatriculaErro as erro:
                 form.add_error(None, erro.message)
             else:
@@ -94,10 +102,18 @@ def minhas_matriculas(request):
     for matricula in matriculas:
         matricula.posicao = services.posicao_na_fila(matricula)
         matricula.percentual = services.percentual_frequencia(matricula)
+        matricula.lista_parcelas = financeiro.parcelas_do_aluno(matricula)
+        matricula.situacao = financeiro.situacao_das_parcelas(matricula.lista_parcelas)
     return render(
         request,
         "matriculas/minhas_matriculas.html",
-        {"matriculas": matriculas, "tem_cadastro": hasattr(request.user, "aluno")},
+        {
+            "matriculas": matriculas,
+            "tem_cadastro": hasattr(request.user, "aluno"),
+            "hoje": timezone.localdate(),
+            "pix_nome": settings.PIX_NOME_RECEBEDOR,
+            "form_comprovante": ComprovanteForm(),
+        },
     )
 
 
@@ -153,6 +169,7 @@ def chamada(request, turma_pk, aula_pk):
         "aula": aula,
         "aulas": turma.aulas.annotate(registros=Count("frequencias")),
         "linhas": services.chamada_da_aula(aula),
+        "situacoes": financeiro.situacoes(turma.matriculas.all()),
         "frequencias": services.resumo_frequencia(turma),
         "hoje": timezone.localdate(),
         "chamada_feita": aula.frequencias.exists(),

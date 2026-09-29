@@ -9,15 +9,18 @@ concluída, uma em andamento e turmas com inscrições abertas.
 """
 
 import datetime
+import io
 import random
 import unicodedata
 from decimal import Decimal
 
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
+from PIL import Image, ImageDraw
 
 from apps.alunos.models import Aluno
 from apps.catalogo.models import Curso, Instrutor
@@ -25,6 +28,8 @@ from apps.catalogo.services import criar_instrutor
 from apps.certificados.models import Certificado
 from apps.certificados.services import concluir_turma
 from apps.contas.services import GRUPO_ADMINISTRADOR, GRUPO_ALUNO, atribuir_perfil
+from apps.financeiro import services as financeiro
+from apps.financeiro.models import Comprovante, Pagamento, Parcela
 from apps.matriculas import services as matriculas
 from apps.matriculas.models import Frequencia, Matricula
 from apps.turmas.models import Aula, Feriado, Turma
@@ -46,6 +51,7 @@ CURSOS = [
         "nome": "Excel",
         "carga_horaria": 30,
         "valor": Decimal("150.00"),
+        "parcelas_max": 3,
         "frequencia_minima": 75,
         "descricao": "Planilhas do básico ao intermediário: fórmulas, funções, gráficos e "
         "tabelas dinâmicas.",
@@ -55,6 +61,7 @@ CURSOS = [
         "nome": "Digitação",
         "carga_horaria": 20,
         "valor": Decimal("80.00"),
+        "parcelas_max": 2,
         "frequencia_minima": 70,
         "descricao": "Digitação com os dez dedos, postura correta e ganho de velocidade.",
         "pre_requisitos": "",
@@ -153,6 +160,11 @@ class Command(BaseCommand):
     # Limpeza
 
     def _limpar(self):
+        Pagamento.objects.all().delete()
+        for comprovante in Comprovante.objects.all():
+            comprovante.arquivo.delete(save=False)
+        Comprovante.objects.all().delete()
+        Parcela.objects.all().delete()
         Certificado.objects.all().delete()
         Frequencia.objects.all().delete()
         Matricula.objects.all().delete()
@@ -180,8 +192,8 @@ class Command(BaseCommand):
         }
         self._criar_admin()
         self.alunos = self._criar_alunos()
-        self._criar_turmas()
         self._criar_usuario_aluno()
+        self._criar_turmas()
 
     def _criar_admin(self):
         if User.objects.filter(username="admin").exists():
@@ -230,12 +242,15 @@ class Command(BaseCommand):
         gerar_aulas(turma)
         return turma
 
-    def _matricular(self, turma, alunos, dias_antes_do_inicio=20):
-        """Matricula pelos serviços (vagas, fila e conflito de horário valem)."""
+    def _matricular(self, turma, alunos, dias_antes_do_inicio=20, n_parcelas=1, descontos=None):
+        """Matricula pelos serviços (vagas, fila, conflito de horário e parcelas valem)."""
         feitas = []
+        descontos = descontos or {}
         for i, aluno in enumerate(alunos):
             try:
-                matricula = matriculas.matricular(aluno, turma)
+                matricula = matriculas.matricular(
+                    aluno, turma, n_parcelas=n_parcelas, desconto=descontos.get(i, Decimal("0"))
+                )
             except matriculas.MatriculaErro:
                 continue
             # Datas de matrícula espalhadas antes do início, na ordem de chegada.
@@ -307,12 +322,13 @@ class Command(BaseCommand):
         # 3) Excel com inscrições abertas (começa em duas semanas), noite.
         inicio = segunda + datetime.timedelta(weeks=2)
         t3 = self._turma(f"EXC-{inicio.year}-01", "Excel", "carlos", inicio, 8, "seg,qua", 18, 15, "Laboratório 2")
-        self._matricular(t3, a[0:9], dias_antes_do_inicio=13)  # quem já fez Informática
+        # Quem já fez Informática; em 3x, com uma bolsa de 50%.
+        self._matricular(t3, a[0:9], dias_antes_do_inicio=13, n_parcelas=3, descontos={4: Decimal("50")})
 
         # 4) Digitação com inscrições abertas, turma pequena já cheia e com fila.
         inicio = segunda + datetime.timedelta(weeks=1)
         t4 = self._turma(f"DIG-{inicio.year}-01", "Digitação", "carlos", inicio, 5, "ter,qui", 9, 6, "Laboratório 2")
-        self._matricular(t4, a[20:30], dias_antes_do_inicio=6)
+        self._matricular(t4, a[20:30], dias_antes_do_inicio=6, n_parcelas=2)
 
         # 5) Internet Segura planejada para o mês que vem (sem inscrições ainda).
         inicio = segunda + datetime.timedelta(weeks=5)
@@ -325,6 +341,68 @@ class Command(BaseCommand):
         for matricula in self._matricular(t6, a[25:28]):
             matriculas.cancelar(matricula)
         Turma.objects.filter(pk=t6.pk).update(status=Turma.Status.CANCELADA)
+
+        # 7) Digitação em andamento (paga, em 2x): um aluno em cada situação de pagamento.
+        inicio = segunda - datetime.timedelta(weeks=5) + datetime.timedelta(days=4)  # sexta
+        t7 = self._turma(f"DIG-{inicio.year}-00", "Digitação", "carlos", inicio, 6, "sex", 18, 8, "Laboratório 2")
+        self._pagamentos_da_turma_em_andamento(t7, [a[0]] + a[9:16])
+        Turma.objects.filter(pk=t7.pk).update(status=Turma.Status.EM_ANDAMENTO)
+        t7.refresh_from_db()
+        self._fazer_chamadas(t7, {aluno.pk: 0.9 for aluno in a}, ["Postura e teclas guia", "Fileira de cima", "Fileira de baixo", "Números", "Velocidade"])
+
+    def _pagamentos_da_turma_em_andamento(self, turma, alunos):
+        """Matrículas feitas antes do início, com parcelas vencendo a partir do 1º dia de aula."""
+        # (número de parcelas, desconto, o que aconteceu com cada parcela)
+        planos = [
+            (2, 0, ["pix", None]),                  # aluno de login: 2ª vencida há poucos dias (pendente)
+            (2, 0, ["dinheiro", "pix"]),            # em dia
+            (1, 0, ["pix"]),                        # à vista, em dia
+            (2, 0, [None, None]),                   # nada pago: inadimplente
+            (2, 0, ["pix", "comprovante"]),         # 2ª com comprovante esperando conferência
+            (1, 100, []),                           # bolsa integral: isento
+            (1, 50, ["dinheiro"]),                  # meia bolsa, à vista
+            (2, 0, ["pix", "recusado"]),            # comprovante recusado: pendente
+        ]
+        admin = User.objects.get(username="admin")
+        for i, (aluno, (n, desconto, eventos)) in enumerate(zip(alunos, planos)):
+            matricula = self._matricular(turma, [aluno], n_parcelas=n, descontos={0: Decimal(desconto)})[0]
+            parcelas = list(matricula.parcelas.order_by("numero"))
+            for k, parcela in enumerate(parcelas):
+                # Como se a matrícula tivesse sido feita antes do início da turma.
+                parcela.vencimento = turma.data_inicio + datetime.timedelta(days=financeiro.DIAS_ENTRE_PARCELAS * k)
+                parcela.save(update_fields=["vencimento"])
+            for parcela, evento in zip(parcelas, eventos):
+                pago_em = min(parcela.vencimento + datetime.timedelta(days=1), self.hoje)
+                if evento in ("pix", "dinheiro"):
+                    financeiro.registrar_pagamento(
+                        parcela,
+                        forma=evento,
+                        data=pago_em,
+                        recebido_por=admin,
+                        codigo_transacao=f"E{self.rng.randint(10**15, 10**16 - 1)}" if evento == "pix" else "",
+                    )
+                elif evento in ("comprovante", "recusado"):
+                    comprovante = financeiro.enviar_comprovante(
+                        parcela, self._imagem_de_comprovante(parcela), aluno.usuario or admin
+                    )
+                    if evento == "recusado":
+                        financeiro.recusar_comprovante(
+                            comprovante, usuario=admin, motivo="O valor do Pix é diferente do valor da parcela."
+                        )
+
+    def _imagem_de_comprovante(self, parcela):
+        """Uma imagem simples no lugar de um comprovante de verdade."""
+        imagem = Image.new("RGB", (360, 480), "white")
+        desenho = ImageDraw.Draw(imagem)
+        # Sem acentos: a fonte padrão do Pillow não tem esses caracteres.
+        linhas = ["Comprovante de Pix", "(exemplo da demonstracao)", "",
+                  f"Valor: R$ {parcela.valor:.2f}".replace(".", ","), f"Identificador: {parcela.identificador}",
+                  f"Para: {settings.PIX_NOME_RECEBEDOR}"]
+        for n, texto in enumerate(linhas):
+            desenho.text((24, 40 + 32 * n), texto, fill="black")
+        buffer = io.BytesIO()
+        imagem.save(buffer, format="PNG")
+        return SimpleUploadedFile("comprovante.png", buffer.getvalue(), content_type="image/png")
 
     def _criar_usuario_aluno(self):
         """Login de aluno ligado a quem concluiu Informática e está inscrito em Excel."""
@@ -349,7 +427,15 @@ class Command(BaseCommand):
         )
         contagem = {s.label: Matricula.objects.filter(status=s).count() for s in Matricula.Status}
         self.stdout.write("  Matrículas: " + ", ".join(f"{n} {rotulo.lower()}" for rotulo, n in contagem.items()))
-        self.stdout.write(f"  {Certificado.objects.count()} certificados emitidos\n")
+        self.stdout.write(f"  {Certificado.objects.count()} certificados emitidos")
+        contagem = {}
+        for situacao in financeiro.situacoes(Matricula.objects.filter(parcelas__isnull=False).distinct()).values():
+            contagem[situacao.rotulo] = contagem.get(situacao.rotulo, 0) + 1
+        self.stdout.write(
+            f"  {Parcela.objects.count()} parcelas, {Pagamento.objects.count()} pagamentos, "
+            f"{Comprovante.objects.filter(status=Comprovante.Status.EM_ANALISE).count()} comprovante(s) para conferir"
+        )
+        self.stdout.write("  Situação financeira: " + ", ".join(f"{n} {r.lower()}" for r, n in sorted(contagem.items())) + "\n")
         for turma in Turma.objects.select_related("curso").order_by("data_inicio"):
             self.stdout.write(
                 f"  {turma.codigo:<12} {turma.curso.nome:<20} {turma.get_status_display():<19} "
@@ -359,4 +445,7 @@ class Command(BaseCommand):
         self.stdout.write("  admin   – Administrador")
         self.stdout.write("  maria   – Instrutora (Informática Básica, Internet Segura)")
         self.stdout.write("  carlos  – Instrutor (Excel, Digitação)")
-        self.stdout.write(f"  aluno   – Aluno ({self.alunos[0].nome}: tem certificado e matrícula em Excel)")
+        self.stdout.write(
+            f"  aluno   – Aluno ({self.alunos[0].nome}: tem certificado, matrícula em Excel e "
+            "uma parcela de Digitação para pagar com Pix)"
+        )

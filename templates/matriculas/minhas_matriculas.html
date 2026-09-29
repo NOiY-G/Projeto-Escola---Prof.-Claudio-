@@ -9,7 +9,8 @@
 <div class="overflow-hidden rounded-lg bg-white shadow">
   <ul class="divide-y divide-slate-100">
     {% for matricula in matriculas %}
-      <li class="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
+      <li class="p-4">
+        <div class="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p class="font-medium">{{ matricula.turma.curso.nome }}</p>
           <p class="text-sm text-slate-600">Turma {{ matricula.turma.codigo }} · {{ matricula.turma.horario_display }}</p>
@@ -26,7 +27,12 @@
           <a href="{% url 'certificados:pdf' matricula.certificado.codigo_validacao %}"
              class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">Baixar certificado</a>
         {% endif %}
+        {% if matricula.lista_parcelas %}{% include "financeiro/_situacao.html" with situacao=matricula.situacao %}{% endif %}
         </div>
+        </div>
+        {% if matricula.lista_parcelas %}
+          {% include "financeiro/_parcelas_do_aluno.html" %}
+        {% endif %}
       </li>
     {% empty %}
       <li class="p-4 text-slate-600">Você ainda não tem matrículas.</li>

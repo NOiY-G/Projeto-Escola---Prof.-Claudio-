@@ -11,6 +11,12 @@ from apps.turmas.models import Turma
 
 
 @pytest.fixture(autouse=True)
+def _arquivos_em_pasta_temporaria(settings, tmp_path):
+    # Comprovantes enviados nos testes não vão para a pasta do projeto.
+    settings.MEDIA_ROOT = tmp_path / "midia"
+
+
+@pytest.fixture(autouse=True)
 def _hash_de_senha_rapido(settings):
     # O hash padrão é lento de propósito; nos testes isso só atrasa a suíte.
     settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]

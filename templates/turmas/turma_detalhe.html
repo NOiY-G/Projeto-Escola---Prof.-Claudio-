@@ -51,6 +51,7 @@
             <span class="font-medium">{{ matricula.aluno.nome }}</span>
           {% endif %}
           <p class="text-xs text-slate-500">{{ matricula.get_status_display }} · matrícula em {{ matricula.data|date:"d/m/Y" }}{% if aulas_realizadas %} · frequência {{ frequencias|valor_de:matricula.pk|percentual }}{% endif %}</p>
+          {% if perfil == "administrador" %}{% include "financeiro/_situacao.html" with situacao=situacoes|valor_de:matricula.pk so_alerta=True %}{% endif %}
         </div>
         {% include "matriculas/_acoes.html" %}
         {% if perfil == "administrador" and matricula.certificado %}

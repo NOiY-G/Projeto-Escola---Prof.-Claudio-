@@ -1,15 +1,13 @@
-import base64
-import io
 import uuid
 from dataclasses import dataclass, field
 
-import qrcode
 from django.conf import settings
 from django.db import transaction
 from django.template.loader import render_to_string
 from django.utils import timezone
 
 from apps.alunos.validators import mascarar_cpf
+from apps.contas.qr import qr_code_data_uri
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO, perfil_do_usuario
 from apps.matriculas import services as matriculas_services
 from apps.matriculas.models import Matricula
@@ -152,13 +150,6 @@ def dados_do_certificado(certificado):
         "emitido_em": timezone.localtime(certificado.emitido_em),
         "codigo": certificado.codigo_validacao,
     }
-
-
-def qr_code_data_uri(texto):
-    imagem = qrcode.make(texto, box_size=10, border=1)
-    buffer = io.BytesIO()
-    imagem.save(buffer, format="PNG")
-    return "data:image/png;base64," + base64.b64encode(buffer.getvalue()).decode()
 
 
 def html_do_certificado(certificado, url_validacao) -> str:

@@ -1,0 +1,12 @@
+{% comment %}Selo da situação financeira. Espera `situacao` (financeiro.services.Situacao).{% endcomment %}
+{% if situacao %}
+  {% if situacao.codigo == "inadimplente" %}
+    <span class="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800" title="Parcela vencida há {{ situacao.dias_atraso }} dia(s)">⚠ Inadimplente</span>
+  {% elif situacao.codigo == "pendente" %}
+    <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800" title="Parcela vencida há {{ situacao.dias_atraso }} dia(s)">! Pendente</span>
+  {% elif situacao.codigo == "em_dia" and not so_alerta %}
+    <span class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">✓ Em dia</span>
+  {% elif situacao.codigo == "isento" and not so_alerta %}
+    <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">Isento</span>
+  {% endif %}
+{% endif %}

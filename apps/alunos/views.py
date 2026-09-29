@@ -1,7 +1,9 @@
 from django.urls import reverse
+from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.catalogo.views import AdminMixin, FormPaginaMixin
+from apps.financeiro import services as financeiro
 
 from . import services
 from .forms import AlunoForm
@@ -29,7 +31,10 @@ class AlunoDetailView(AdminMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         return super().get_context_data(
-            historico=services.historico_do_aluno(self.object), **kwargs
+            historico=services.historico_do_aluno(self.object),
+            financeiro=financeiro.resumo_do_aluno(self.object),
+            hoje=timezone.localdate(),
+            **kwargs,
         )
 
 

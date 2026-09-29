@@ -1,21 +1,85 @@
-<a class="{{ classe }}" href="{% url 'contas:painel' %}">Painel</a>
-{% if perfil == "administrador" %}
-  <a class="{{ classe }}" href="{% url 'catalogo:curso_lista' %}">Cursos</a>
-  <a class="{{ classe }}" href="{% url 'catalogo:instrutor_lista' %}">Instrutores</a>
-  <a class="{{ classe }}" href="{% url 'turmas:turma_lista' %}">Turmas</a>
-  <a class="{{ classe }}" href="{% url 'turmas:feriados' %}">Feriados</a>
-  <a class="{{ classe }}" href="{% url 'alunos:aluno_lista' %}">Alunos</a>
-  <a class="{{ classe }}" href="{% url 'matriculas:lista_espera' %}">Lista de espera</a>
-  <a class="{{ classe }}" href="{% url 'certificados:lista' %}">Certificados</a>
-  <a class="{{ classe }}" href="{% url 'relatorios:inicio' %}">Relatórios</a>
-  <a class="{{ classe }}" href="{% url 'admin:index' %}">Admin</a>
-{% elif perfil == "instrutor" %}
-  <a class="{{ classe }}" href="{% url 'turmas:turma_lista' %}">Minhas turmas</a>
-{% elif perfil == "aluno" %}
-  <a class="{{ classe }}" href="{% url 'matriculas:minhas_matriculas' %}">Minhas matrículas</a>
-{% endif %}
-<span class="{{ classe }} opacity-80">{{ user.get_full_name|default:user.username }}</span>
-<form method="post" action="{% url 'contas:logout' %}" class="inline">
-  {% csrf_token %}
-  <button type="submit" class="{{ classe }} w-full text-left">Sair</button>
-</form>
+{% comment %}
+Menu do topo. `menu` vem de apps/contas/menu.py (itens soltos e grupos).
+Computador: grupos viram menus que abrem ao clicar. Celular: lista com títulos de seção.
+{% endcomment %}
+{% with nome=user.get_full_name|default:user.username %}
+
+{# Computador #}
+<ul class="hidden items-center gap-1 whitespace-nowrap lg:flex" role="list">
+  {% for entrada in menu %}
+    <li>
+      {% if entrada.itens %}
+        <details class="menu-grupo relative">
+          <summary class="flex cursor-pointer list-none items-center gap-1 rounded px-3 py-1.5 hover:bg-white/10 {% if entrada.ativo %}bg-white/15 font-medium{% endif %}">
+            {{ entrada.rotulo }}
+            {% if entrada.contador %}<span class="rounded-full bg-amber-400 px-1.5 text-xs font-semibold text-slate-900">{{ entrada.contador }}</span>{% endif %}
+            <span aria-hidden="true" class="text-xs opacity-70">▾</span>
+          </summary>
+          <div class="absolute left-0 z-20 mt-1 min-w-52 rounded-md bg-white py-1 text-slate-800 shadow-lg ring-1 ring-black/5">
+            {% for item in entrada.itens %}
+              <a href="{{ item.url }}" class="flex items-center justify-between gap-3 px-4 py-2 text-sm hover:bg-slate-100 {% if item.ativo %}font-semibold text-indigo-700{% endif %}"
+                 {% if item.ativo %}aria-current="page"{% endif %}>
+                {{ item.rotulo }}
+                {% if item.contador %}<span class="rounded-full bg-amber-100 px-2 text-xs font-semibold text-amber-800">{{ item.contador }}</span>{% endif %}
+              </a>
+            {% endfor %}
+          </div>
+        </details>
+      {% else %}
+        <a href="{{ entrada.url }}" class="block rounded px-3 py-1.5 hover:bg-white/10 {% if entrada.ativo %}bg-white/15 font-medium{% endif %}"
+           {% if entrada.ativo %}aria-current="page"{% endif %}>{{ entrada.rotulo }}</a>
+      {% endif %}
+    </li>
+  {% endfor %}
+  <li class="ml-2">
+    <details class="menu-grupo relative">
+      <summary class="flex cursor-pointer list-none items-center gap-1 rounded px-3 py-1.5 opacity-90 hover:bg-white/10">
+        {{ nome }} <span aria-hidden="true" class="text-xs opacity-70">▾</span>
+      </summary>
+      <div class="absolute right-0 z-20 mt-1 min-w-40 rounded-md bg-white py-1 text-slate-800 shadow-lg ring-1 ring-black/5">
+        {% if perfil == "administrador" %}
+          <a href="{% url 'admin:index' %}" class="block px-4 py-2 text-sm hover:bg-slate-100">Django Admin</a>
+        {% endif %}
+        <form method="post" action="{% url 'contas:logout' %}">
+          {% csrf_token %}
+          <button type="submit" class="block w-full px-4 py-2 text-left text-sm hover:bg-slate-100">Sair</button>
+        </form>
+      </div>
+    </details>
+  </li>
+</ul>
+
+{# Celular #}
+<details class="menu-grupo relative lg:hidden">
+  <summary class="cursor-pointer list-none rounded px-3 py-1 ring-1 ring-white/40">Menu</summary>
+  <div class="absolute right-0 z-20 mt-2 max-h-[80vh] w-64 overflow-y-auto rounded-md bg-white py-2 text-slate-800 shadow-lg">
+    {# Itens soltos primeiro; depois cada grupo com o seu título, para não parecerem do último grupo. #}
+    {% for entrada in menu %}
+      {% if not entrada.itens %}
+        <a href="{{ entrada.url }}" class="block px-4 py-2 hover:bg-slate-100 {% if entrada.ativo %}font-semibold text-indigo-700{% endif %}">{{ entrada.rotulo }}</a>
+      {% endif %}
+    {% endfor %}
+    {% for entrada in menu %}
+      {% if entrada.itens %}
+        <p class="px-4 pt-3 pb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{{ entrada.rotulo }}</p>
+        {% for item in entrada.itens %}
+          <a href="{{ item.url }}" class="flex items-center justify-between px-4 py-2 hover:bg-slate-100 {% if item.ativo %}font-semibold text-indigo-700{% endif %}">
+            {{ item.rotulo }}
+            {% if item.contador %}<span class="rounded-full bg-amber-100 px-2 text-xs font-semibold text-amber-800">{{ item.contador }}</span>{% endif %}
+          </a>
+        {% endfor %}
+      {% endif %}
+    {% endfor %}
+    <div class="mt-2 border-t border-slate-100 pt-2">
+      <p class="px-4 py-1 text-sm text-slate-500">{{ nome }}</p>
+      {% if perfil == "administrador" %}
+        <a href="{% url 'admin:index' %}" class="block px-4 py-2 hover:bg-slate-100">Django Admin</a>
+      {% endif %}
+      <form method="post" action="{% url 'contas:logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="block w-full px-4 py-2 text-left hover:bg-slate-100">Sair</button>
+      </form>
+    </div>
+  </div>
+</details>
+{% endwith %}

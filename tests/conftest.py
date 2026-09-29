@@ -10,6 +10,12 @@ from apps.contas.services import GRUPO_ADMINISTRADOR, GRUPO_ALUNO, GRUPO_INSTRUT
 from apps.turmas.models import Turma
 
 
+@pytest.fixture(autouse=True)
+def _hash_de_senha_rapido(settings):
+    # O hash padrão é lento de propósito; nos testes isso só atrasa a suíte.
+    settings.PASSWORD_HASHERS = ["django.contrib.auth.hashers.MD5PasswordHasher"]
+
+
 def _usuario(username, grupo=None):
     usuario = User.objects.create_user(username, f"{username}@exemplo.com", "senha-forte-123")
     if grupo:

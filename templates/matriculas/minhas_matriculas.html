@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load formatos %}
 {% block title %}Minhas matrículas · Cursos Livres{% endblock %}
 {% block content %}
 <h1 class="mb-4 text-2xl font-semibold">Minhas matrículas</h1>
@@ -13,6 +14,9 @@
           <p class="font-medium">{{ matricula.turma.curso.nome }}</p>
           <p class="text-sm text-slate-600">Turma {{ matricula.turma.codigo }} · {{ matricula.turma.horario_display }}</p>
           <p class="text-sm text-slate-600">{{ matricula.turma.data_inicio|date:"d/m/Y" }} a {{ matricula.turma.data_fim|date:"d/m/Y" }}{% if matricula.turma.sala %} · {{ matricula.turma.sala }}{% endif %}</p>
+          {% if matricula.status != "lista_espera" and matricula.percentual is not None %}
+            <p class="text-sm text-slate-600">Frequência: {{ matricula.percentual|percentual }} (mínimo {{ matricula.turma.curso.frequencia_minima }}%)</p>
+          {% endif %}
         </div>
         <span class="text-sm font-medium {% if matricula.status == 'lista_espera' %}text-amber-700{% else %}text-slate-700{% endif %}">
           {{ matricula.get_status_display }}{% if matricula.posicao %} ({{ matricula.posicao }}º na fila){% endif %}

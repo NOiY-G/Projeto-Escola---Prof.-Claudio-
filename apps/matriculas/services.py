@@ -1,13 +1,13 @@
 import datetime
 
 from django.core.exceptions import ValidationError
-from django.db import transaction
+from django.db import models, transaction
 from django.utils import timezone
 
 from apps.turmas.models import DIA_PARA_WEEKDAY, Turma
 from apps.turmas.services import vagas_livres
 
-from .models import Matricula
+from .models import Frequencia, Matricula
 
 # Status em que a matrícula ainda "segura" o aluno na turma.
 STATUS_EM_ABERTO = (Matricula.Status.ATIVA, Matricula.Status.LISTA_ESPERA)
@@ -176,3 +176,106 @@ def filas_de_espera():
     for matricula in matriculas:
         filas.setdefault(matricula.turma, []).append(matricula)
     return filas
+
+
+# Chamada e frequência
+
+
+def aulas_realizadas(turma, hoje=None):
+    """Aulas cuja data já chegou (hoje inclusive)."""
+    hoje = hoje or timezone.localdate()
+    return turma.aulas.filter(data__lte=hoje)
+
+
+def aula_padrao(turma, hoje=None):
+    """A aula que a chamada abre: a de hoje, senão a última que passou, senão a primeira."""
+    hoje = hoje or timezone.localdate()
+    return (
+        turma.aulas.filter(data__lte=hoje).order_by("-data").first()
+        or turma.aulas.order_by("data").first()
+    )
+
+
+def chamada_da_aula(aula):
+    """Linhas da chamada: cada matrícula ativa com a frequência já gravada (ou None)."""
+    gravadas = {f.matricula_id: f for f in aula.frequencias.all()}
+    return [(m, gravadas.get(m.pk)) for m in matriculas_da_chamada(aula.turma)]
+
+
+def matriculas_da_chamada(turma):
+    """Quem aparece na chamada: as matrículas ativas, em ordem alfabética."""
+    return (
+        turma.matriculas.filter(status=Matricula.Status.ATIVA)
+        .select_related("aluno")
+        .order_by("aluno__nome")
+    )
+
+
+@transaction.atomic
+def registrar_chamada(aula, presentes, observacoes=None, conteudo=None, hoje=None):
+    """Grava a presença de todas as matrículas ativas da turma nesta aula.
+
+    `presentes` são os ids das matrículas presentes; quem não estiver lá fica
+    com falta. `observacoes` é um dict {id da matrícula: texto}.
+    """
+    hoje = hoje or timezone.localdate()
+    if aula.data > hoje:
+        raise MatriculaErro("Não é possível fazer a chamada de uma aula que ainda não aconteceu.")
+    if aula.turma.status in (Turma.Status.CONCLUIDA, Turma.Status.CANCELADA):
+        raise MatriculaErro(
+            f"A turma está {aula.turma.get_status_display().lower()}; a chamada não pode mais ser alterada."
+        )
+    presentes = {int(pk) for pk in presentes}
+    observacoes = {int(pk): (texto or "").strip() for pk, texto in (observacoes or {}).items()}
+
+    matriculas = list(matriculas_da_chamada(aula.turma))
+    desconhecidas = presentes - {m.pk for m in matriculas}
+    if desconhecidas:
+        raise MatriculaErro("A chamada tem alunos que não estão ativos nesta turma.")
+
+    frequencias = []
+    for matricula in matriculas:
+        frequencia, _ = Frequencia.objects.update_or_create(
+            matricula=matricula,
+            aula=aula,
+            defaults={
+                "presente": matricula.pk in presentes,
+                "observacao": observacoes.get(matricula.pk, "")[:255],
+            },
+        )
+        frequencias.append(frequencia)
+
+    if conteudo is not None:
+        aula.conteudo = conteudo.strip()
+        aula.save(update_fields=["conteudo"])
+    return frequencias
+
+
+def percentual_frequencia(matricula, hoje=None):
+    """Regra 4: presenças / aulas já realizadas × 100.
+
+    Aula realizada é a que tem data até hoje; sem chamada registrada conta como
+    falta. Retorna None se a turma ainda não teve aula.
+    """
+    realizadas = aulas_realizadas(matricula.turma, hoje)
+    total = realizadas.count()
+    if total == 0:
+        return None
+    presencas = matricula.frequencias.filter(aula__in=realizadas, presente=True).count()
+    return round(presencas * 100 / total, 1)
+
+
+def resumo_frequencia(turma, hoje=None):
+    """{id da matrícula: percentual} para todas as matrículas da turma."""
+    realizadas = list(aulas_realizadas(turma, hoje).values_list("pk", flat=True))
+    if not realizadas:
+        return {}
+    presencas = dict(
+        Frequencia.objects.filter(matricula__turma=turma, aula_id__in=realizadas, presente=True)
+        .values_list("matricula_id")
+        .annotate(total=models.Count("pk"))
+    )
+    return {
+        pk: round(presencas.get(pk, 0) * 100 / len(realizadas), 1)
+        for pk in turma.matriculas.values_list("pk", flat=True)
+    }

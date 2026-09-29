@@ -26,3 +26,21 @@ def cpf(valor):
 @register.filter
 def cpf_mascarado(valor):
     return mascarar_cpf(valor)
+
+
+@register.filter
+def valor_de(dicionario, chave):
+    """{{ dicionario|valor_de:chave }} — lê um dict usando uma variável como chave."""
+    try:
+        return dicionario.get(chave)
+    except AttributeError:
+        return None
+
+
+@register.filter
+def percentual(valor):
+    """75.0 -> "75%", 66.7 -> "66,7%", None -> "—" """
+    if valor is None:
+        return "—"
+    texto = f"{valor:.1f}".rstrip("0").rstrip(".").replace(".", ",")
+    return f"{texto}%"

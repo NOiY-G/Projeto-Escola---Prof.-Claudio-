@@ -1,11 +1,14 @@
 from django.contrib import messages
+from django.db.models import Count
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
 from apps.contas.decorators import perfil_requerido
-from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO
+from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO, PERFIL_INSTRUTOR
+from apps.turmas import services as turmas_services
 
 from . import services
 from .forms import MatriculaForm
@@ -89,8 +92,72 @@ def minhas_matriculas(request):
     matriculas = list(services.matriculas_do_usuario(request.user))
     for matricula in matriculas:
         matricula.posicao = services.posicao_na_fila(matricula)
+        matricula.percentual = services.percentual_frequencia(matricula)
     return render(
         request,
         "matriculas/minhas_matriculas.html",
         {"matriculas": matriculas, "tem_cadastro": hasattr(request.user, "aluno")},
     )
+
+
+# Chamada
+
+
+def _turma_da_chamada(request, turma_pk):
+    """Administrador abre qualquer turma; instrutor, só as próprias (senão 404)."""
+    return get_object_or_404(turmas_services.turmas_visiveis_para(request.user), pk=turma_pk)
+
+
+@perfil_requerido(PERFIL_ADMINISTRADOR, PERFIL_INSTRUTOR)
+def chamada_inicio(request, turma_pk):
+    turma = _turma_da_chamada(request, turma_pk)
+    aula = services.aula_padrao(turma)
+    if aula is None:
+        messages.warning(request, "Esta turma ainda não tem aulas no calendário.")
+        return redirect("turmas:turma_detalhe", pk=turma.pk)
+    return redirect("matriculas:chamada", turma_pk=turma.pk, aula_pk=aula.pk)
+
+
+@perfil_requerido(PERFIL_ADMINISTRADOR, PERFIL_INSTRUTOR)
+def chamada(request, turma_pk, aula_pk):
+    turma = _turma_da_chamada(request, turma_pk)
+    aula = get_object_or_404(turma.aulas, pk=aula_pk)
+    erro = None
+    salva = False
+
+    if request.method == "POST":
+        observacoes = {
+            chave.removeprefix("obs_"): valor
+            for chave, valor in request.POST.items()
+            if chave.startswith("obs_") and chave.removeprefix("obs_").isdigit()
+        }
+        try:
+            services.registrar_chamada(
+                aula,
+                presentes=[pk for pk in request.POST.getlist("presente") if pk.isdigit()],
+                observacoes=observacoes,
+                conteudo=request.POST.get("conteudo", ""),
+            )
+        except services.MatriculaErro as e:
+            erro = e.message
+        else:
+            salva = True
+            if not request.headers.get("HX-Request"):
+                messages.success(request, f"Chamada de {aula.data:%d/%m/%Y} salva.")
+                return redirect("matriculas:chamada", turma_pk=turma.pk, aula_pk=aula.pk)
+        aula.refresh_from_db()
+
+    contexto = {
+        "turma": turma,
+        "aula": aula,
+        "aulas": turma.aulas.annotate(registros=Count("frequencias")),
+        "linhas": services.chamada_da_aula(aula),
+        "frequencias": services.resumo_frequencia(turma),
+        "hoje": timezone.localdate(),
+        "chamada_feita": aula.frequencias.exists(),
+        "erro": erro,
+        "salva": salva,
+    }
+    if request.headers.get("HX-Request"):
+        return render(request, "matriculas/_chamada_form.html", contexto)
+    return render(request, "matriculas/chamada.html", contexto)

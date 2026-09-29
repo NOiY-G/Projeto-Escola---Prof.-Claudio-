@@ -50,9 +50,27 @@ class TurmaDetailView(AdminOuInstrutorMixin, DetailView):
             .exclude(status=Matricula.Status.LISTA_ESPERA)
             .order_by("status", "aluno__nome"),
             fila=matriculas_services.lista_espera(turma),
+            frequencias=matriculas_services.resumo_frequencia(turma),
+            total_aulas=turma.aulas.count(),
+            aulas_realizadas=matriculas_services.aulas_realizadas(turma).count(),
             vagas_ocupadas=services.vagas_ocupadas(turma),
             vagas_livres=services.vagas_livres(turma),
             **kwargs,
+        )
+
+
+def _avisar_geracao(request, resultado):
+    if resultado.criadas:
+        n = len(resultado.criadas)
+        messages.info(request, f"{n} aula{'s' if n > 1 else ''} gerada{'s' if n > 1 else ''} no calendário.")
+    if resultado.removidas:
+        n = len(resultado.removidas)
+        messages.info(request, f"{n} aula{'s' if n > 1 else ''} fora do novo calendário removida{'s' if n > 1 else ''}.")
+    if resultado.mantidas:
+        datas = ", ".join(f"{a.data:%d/%m/%Y}" for a in resultado.mantidas)
+        messages.warning(
+            request,
+            f"Aulas fora do novo calendário foram mantidas porque já têm chamada: {datas}.",
         )
 
 
@@ -65,6 +83,11 @@ class TurmaCreateView(AdminMixin, FormPaginaMixin, CreateView):
     @property
     def voltar_url(self):
         return reverse("turmas:turma_lista")
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        _avisar_geracao(self.request, services.gerar_aulas(self.object))
+        return resposta
 
     def get_success_url(self):
         return reverse("turmas:turma_detalhe", args=[self.object.pk])
@@ -81,6 +104,8 @@ class TurmaUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
 
     def form_valid(self, form):
         resposta = super().form_valid(form)
+        if services.calendario_mudou(form.changed_data):
+            _avisar_geracao(self.request, services.gerar_aulas(self.object))
         # Mais vagas (ou reabertura da turma) chamam os primeiros da fila.
         for matricula in matriculas_services.preencher_vagas(self.object):
             messages.info(

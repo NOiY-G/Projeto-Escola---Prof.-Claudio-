@@ -5,4 +5,23 @@
 <p class="mt-1 text-slate-600">
   {% if perfil %}Perfil: {{ perfil|capfirst }}{% else %}Seu usuário ainda não tem perfil atribuído. Procure a administração.{% endif %}
 </p>
+
+{% if perfil == "instrutor" %}
+  <h2 class="mt-6 mb-2 text-lg font-semibold">Aulas de hoje</h2>
+  <div class="overflow-hidden rounded-lg bg-white shadow">
+    <ul class="divide-y divide-slate-100">
+      {% for aula in aulas_hoje %}
+        <li class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="font-medium">{{ aula.turma.codigo }} · {{ aula.turma.curso.nome }}</p>
+            <p class="text-sm text-slate-600">{{ aula.turma.hora_inicio|time:"H:i" }}–{{ aula.turma.hora_fim|time:"H:i" }}{% if aula.turma.sala %} · {{ aula.turma.sala }}{% endif %}</p>
+          </div>
+          <a href="{% url 'matriculas:chamada' aula.turma.pk aula.pk %}" class="rounded bg-indigo-700 px-4 py-2 text-center text-sm font-medium text-white hover:bg-indigo-800">Fazer chamada</a>
+        </li>
+      {% empty %}
+        <li class="p-4 text-slate-600">Nenhuma aula hoje.</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
 {% endblock %}

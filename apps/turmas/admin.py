@@ -1,5 +1,6 @@
 from django.contrib import admin
 
+from . import services
 from .models import Aula, Turma
 
 
@@ -16,6 +17,11 @@ class TurmaAdmin(admin.ModelAdmin):
     autocomplete_fields = ["curso", "instrutor"]
     date_hierarchy = "data_inicio"
     inlines = [AulaInline]
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if not change or services.calendario_mudou(form.changed_data):
+            services.gerar_aulas(form.instance)
 
 
 @admin.register(Aula)

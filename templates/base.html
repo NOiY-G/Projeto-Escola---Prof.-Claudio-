@@ -10,17 +10,9 @@
 <body class="min-h-screen bg-slate-50 text-slate-800" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
   {% if user.is_authenticated %}
   <header class="bg-indigo-700 text-white">
-    <nav class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between gap-2 px-4 py-2" aria-label="Menu principal">
       <a href="{% url 'contas:painel' %}" class="text-lg font-semibold">Cursos Livres</a>
-      <details class="relative lg:hidden">
-        <summary class="cursor-pointer list-none rounded px-3 py-1 ring-1 ring-white/40">Menu</summary>
-        <div class="absolute right-0 z-10 mt-2 w-48 rounded bg-white py-2 text-slate-800 shadow">
-          {% include "partials/menu.html" with classe="block px-4 py-2 hover:bg-slate-100" %}
-        </div>
-      </details>
-      <div class="hidden flex-wrap items-center justify-end gap-x-4 gap-y-1 whitespace-nowrap lg:flex">
-        {% include "partials/menu.html" with classe="hover:underline" %}
-      </div>
+      {% include "partials/menu.html" %}
     </nav>
   </header>
   {% endif %}
@@ -39,5 +31,17 @@
     {% endif %}
     {% block content %}{% endblock %}
   </main>
+  <script>
+    // Menus do topo: só um aberto por vez; fecham ao clicar fora ou com Esc.
+    (function () {
+      const grupos = () => document.querySelectorAll("details.menu-grupo[open]");
+      document.addEventListener("click", (e) => {
+        grupos().forEach((d) => { if (!d.contains(e.target)) d.removeAttribute("open"); });
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") grupos().forEach((d) => d.removeAttribute("open"));
+      });
+    })();
+  </script>
 </body>
 </html>

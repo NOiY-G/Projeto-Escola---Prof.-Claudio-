@@ -27,8 +27,8 @@ from apps.certificados.services import concluir_turma
 from apps.contas.services import GRUPO_ADMINISTRADOR, GRUPO_ALUNO, atribuir_perfil
 from apps.matriculas import services as matriculas
 from apps.matriculas.models import Frequencia, Matricula
-from apps.turmas.models import Aula, Turma
-from apps.turmas.services import gerar_aulas
+from apps.turmas.models import Aula, Feriado, Turma
+from apps.turmas.services import cadastrar_feriados_nacionais, gerar_aulas
 
 SENHA_PADRAO = "demo1234"
 
@@ -158,6 +158,7 @@ class Command(BaseCommand):
         Matricula.objects.all().delete()
         Aula.objects.all().delete()
         Turma.objects.all().delete()
+        Feriado.objects.all().delete()
         Aluno.objects.all().delete()
         usuarios = list(Instrutor.objects.values_list("usuario_id", flat=True))
         Instrutor.objects.all().delete()
@@ -170,6 +171,9 @@ class Command(BaseCommand):
     # Dados
 
     def _popular(self):
+        # Feriados antes das turmas: as aulas já são geradas sem eles.
+        for ano in (self.hoje.year - 1, self.hoje.year, self.hoje.year + 1):
+            cadastrar_feriados_nacionais(ano)
         self.cursos = {c["nome"]: Curso.objects.create(**c) for c in CURSOS}
         self.instrutores = {
             i["username"]: criar_instrutor(senha=self.senha, **i) for i in INSTRUTORES
@@ -341,7 +345,7 @@ class Command(BaseCommand):
         self.stdout.write(
             f"  {Curso.objects.count()} cursos, {Instrutor.objects.count()} instrutores, "
             f"{Aluno.objects.count()} alunos, {Turma.objects.count()} turmas, "
-            f"{Aula.objects.count()} aulas"
+            f"{Aula.objects.count()} aulas, {Feriado.objects.count()} feriados"
         )
         contagem = {s.label: Matricula.objects.filter(status=s).count() for s in Matricula.Status}
         self.stdout.write("  Matrículas: " + ", ".join(f"{n} {rotulo.lower()}" for rotulo, n in contagem.items()))

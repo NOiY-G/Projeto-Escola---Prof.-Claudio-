@@ -24,8 +24,8 @@ Acesse http://127.0.0.1:8000/ para o sistema e http://127.0.0.1:8000/admin/ para
 ### Dados de demonstração
 
 `python manage.py popular_demo` cria os cursos Informática Básica, Excel, Digitação e
-Internet Segura, dois instrutores, 30 alunos e seis turmas (uma em cada situação), com
-matrículas, lista de espera, chamadas e certificados. As datas são relativas ao dia em que o
+Internet Segura, dois instrutores, 30 alunos, os feriados nacionais e seis turmas (uma em
+cada situação), com matrículas, lista de espera, chamadas e certificados. As datas são relativas ao dia em que o
 comando roda.
 
 | Usuário | Perfil |

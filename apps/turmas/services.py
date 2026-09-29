@@ -5,7 +5,7 @@ from django.db import transaction
 
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_INSTRUTOR, perfil_do_usuario
 
-from .models import DIA_PARA_WEEKDAY, Aula, Turma
+from .models import DIA_PARA_WEEKDAY, Aula, Feriado, Turma
 
 
 def turmas_visiveis_para(usuario):
@@ -43,12 +43,15 @@ def vagas_livres(turma):
 
 
 def datas_das_aulas(turma):
-    """Todas as datas entre o início e o fim da turma que caem nos dias da semana dela."""
+    """Datas entre o início e o fim da turma nos dias da semana dela, menos os feriados."""
     weekdays = {DIA_PARA_WEEKDAY[d] for d in turma.dias_semana_lista}
+    feriados = set(
+        Feriado.objects.filter(data__range=(turma.data_inicio, turma.data_fim)).values_list("data", flat=True)
+    )
     dia = turma.data_inicio
     datas = []
     while dia <= turma.data_fim:
-        if dia.weekday() in weekdays:
+        if dia.weekday() in weekdays and dia not in feriados:
             datas.append(dia)
         dia += datetime.timedelta(days=1)
     return datas
@@ -108,3 +111,101 @@ def aulas_do_dia(usuario, dia):
         .select_related("turma__curso")
         .order_by("turma__hora_inicio")
     )
+
+
+# Feriados
+
+
+TURMAS_ENCERRADAS = (Turma.Status.CONCLUIDA, Turma.Status.CANCELADA)
+
+
+def turmas_no_dia(data):
+    """Turmas não encerradas cujo período inclui a data."""
+    return (
+        Turma.objects.exclude(status__in=TURMAS_ENCERRADAS)
+        .filter(data_inicio__lte=data, data_fim__gte=data)
+        .order_by("codigo")
+    )
+
+
+@dataclass
+class ResultadoFeriado:
+    removidas: list = field(default_factory=list)
+    # Aulas no feriado que já têm chamada: ficam, para não perder a frequência.
+    mantidas: list = field(default_factory=list)
+    criadas: list = field(default_factory=list)
+
+
+@transaction.atomic
+def cadastrar_feriado(data, descricao):
+    """Cadastra o feriado e tira do calendário as aulas desse dia (sem chamada)."""
+    feriado = Feriado.objects.create(data=data, descricao=descricao.strip())
+    resultado = ResultadoFeriado()
+    aulas = Aula.objects.filter(turma__in=turmas_no_dia(data), data=data).select_related("turma")
+    for aula in aulas:
+        if aula.frequencias.exists():
+            resultado.mantidas.append(aula)
+        else:
+            resultado.removidas.append(aula)
+    Aula.objects.filter(pk__in=[a.pk for a in resultado.removidas]).delete()
+    return feriado, resultado
+
+
+@transaction.atomic
+def remover_feriado(feriado):
+    """Apaga o feriado e devolve a aula desse dia às turmas que têm aula naquele dia da semana."""
+    data = feriado.data
+    feriado.delete()
+    resultado = ResultadoFeriado()
+    for turma in turmas_no_dia(data):
+        tem_aula_no_dia = data.weekday() in {DIA_PARA_WEEKDAY[d] for d in turma.dias_semana_lista}
+        if tem_aula_no_dia and not turma.aulas.filter(data=data).exists():
+            resultado.criadas.append(Aula.objects.create(turma=turma, data=data))
+    return resultado
+
+
+def pascoa(ano):
+    """Domingo de Páscoa (algoritmo de Meeus/Jones/Butcher, calendário gregoriano)."""
+    a, b, c = ano % 19, ano // 100, ano % 100
+    d, e = b // 4, b % 4
+    f = (b + 8) // 25
+    g = (b - f + 1) // 3
+    h = (19 * a + b - d - g + 15) % 30
+    i, k = c // 4, c % 4
+    l = (32 + 2 * e + 2 * i - h - k) % 7
+    m = (a + 11 * h + 22 * l) // 451
+    mes = (h + l - 7 * m + 114) // 31
+    dia = (h + l - 7 * m + 114) % 31 + 1
+    return datetime.date(ano, mes, dia)
+
+
+def feriados_nacionais(ano):
+    """Feriados nacionais oficiais (Lei 662/1949 e alterações; Lei 14.759/2023)."""
+    return [
+        (datetime.date(ano, 1, 1), "Confraternização Universal"),
+        (pascoa(ano) - datetime.timedelta(days=2), "Sexta-feira Santa"),
+        (datetime.date(ano, 4, 21), "Tiradentes"),
+        (datetime.date(ano, 5, 1), "Dia do Trabalho"),
+        (datetime.date(ano, 9, 7), "Independência do Brasil"),
+        (datetime.date(ano, 10, 12), "Nossa Senhora Aparecida"),
+        (datetime.date(ano, 11, 2), "Finados"),
+        (datetime.date(ano, 11, 15), "Proclamação da República"),
+        (datetime.date(ano, 11, 20), "Dia Nacional de Zumbi e da Consciência Negra"),
+        (datetime.date(ano, 12, 25), "Natal"),
+    ]
+
+
+@transaction.atomic
+def cadastrar_feriados_nacionais(ano):
+    """Cadastra os feriados nacionais do ano que ainda não existem."""
+    existentes = set(Feriado.objects.filter(data__year=ano).values_list("data", flat=True))
+    cadastrados = []
+    resultado = ResultadoFeriado()
+    for data, descricao in feriados_nacionais(ano):
+        if data in existentes:
+            continue
+        feriado, parcial = cadastrar_feriado(data, descricao)
+        cadastrados.append(feriado)
+        resultado.removidas += parcial.removidas
+        resultado.mantidas += parcial.mantidas
+    return cadastrados, resultado

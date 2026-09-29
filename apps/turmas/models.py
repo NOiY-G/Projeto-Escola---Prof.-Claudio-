@@ -121,3 +121,18 @@ class Aula(models.Model):
 
     def __str__(self):
         return f"{self.turma.codigo} – {self.data:%d/%m/%Y}"
+
+
+class Feriado(models.Model):
+    """Dia sem aula para todas as turmas (feriado, recesso, ponto facultativo)."""
+
+    data = models.DateField("data", unique=True)
+    descricao = models.CharField("descrição", max_length=120)
+
+    class Meta:
+        verbose_name = "feriado"
+        verbose_name_plural = "feriados"
+        ordering = ["data"]
+
+    def __str__(self):
+        return f"{self.data:%d/%m/%Y} – {self.descricao}"

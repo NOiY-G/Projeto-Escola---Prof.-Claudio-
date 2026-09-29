@@ -1,18 +1,20 @@
 from django.contrib import messages
+from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils import timezone
+from django.views.decorators.http import require_POST
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from apps.catalogo.models import Curso
 from apps.catalogo.views import AdminMixin, FormPaginaMixin
-from apps.contas.decorators import PerfilRequeridoMixin
+from apps.contas.decorators import PerfilRequeridoMixin, perfil_requerido
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_INSTRUTOR
-
 from apps.matriculas import services as matriculas_services
 from apps.matriculas.models import Matricula
 
 from . import services
-from .forms import TurmaForm
-from .models import Turma
+from .forms import FeriadoForm, TurmaForm
+from .models import Feriado, Turma
 
 
 class AdminOuInstrutorMixin(PerfilRequeridoMixin):
@@ -120,3 +122,87 @@ class TurmaUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
 
     def get_success_url(self):
         return reverse("turmas:turma_detalhe", args=[self.object.pk])
+
+
+# Feriados
+
+
+def _codigos(aulas):
+    return ", ".join(sorted({a.turma.codigo for a in aulas}))
+
+
+def _avisar_feriado(request, resultado):
+    if resultado.removidas:
+        messages.info(
+            request,
+            f"{len(resultado.removidas)} aula(s) retirada(s) do calendário: {_codigos(resultado.removidas)}.",
+        )
+    if resultado.mantidas:
+        messages.warning(
+            request,
+            "Aulas mantidas porque já têm chamada nesse dia: "
+            + "; ".join(f"{a.turma.codigo} em {a.data:%d/%m/%Y}" for a in resultado.mantidas)
+            + ". Se não houve aula, apague-as pelo Django Admin.",
+        )
+    if resultado.criadas:
+        messages.info(
+            request,
+            f"{len(resultado.criadas)} aula(s) devolvida(s) ao calendário: {_codigos(resultado.criadas)}.",
+        )
+
+
+@perfil_requerido(PERFIL_ADMINISTRADOR)
+def feriados(request):
+    hoje = timezone.localdate()
+    ano = int(request.GET["ano"]) if request.GET.get("ano", "").isdigit() else hoje.year
+    if request.method == "POST":
+        form = FeriadoForm(request.POST)
+        if form.is_valid():
+            feriado, resultado = services.cadastrar_feriado(
+                form.cleaned_data["data"], form.cleaned_data["descricao"]
+            )
+            messages.success(request, f"Feriado de {feriado.data:%d/%m/%Y} cadastrado.")
+            _avisar_feriado(request, resultado)
+            return redirect(f"{reverse('turmas:feriados')}?ano={feriado.data.year}")
+    else:
+        form = FeriadoForm()
+    anos = sorted({d.year for d in Feriado.objects.dates("data", "year")} | {hoje.year, hoje.year + 1})
+    return render(
+        request,
+        "turmas/feriados.html",
+        {
+            "form": form,
+            "ano": ano,
+            "anos": anos,
+            "feriados": Feriado.objects.filter(data__year=ano),
+            "hoje": hoje,
+            "faltam_nacionais": any(
+                not Feriado.objects.filter(data=data).exists()
+                for data, _ in services.feriados_nacionais(ano)
+            ),
+        },
+    )
+
+
+@require_POST
+@perfil_requerido(PERFIL_ADMINISTRADOR)
+def feriados_nacionais(request):
+    ano = int(request.POST["ano"]) if request.POST.get("ano", "").isdigit() else timezone.localdate().year
+    cadastrados, resultado = services.cadastrar_feriados_nacionais(ano)
+    if cadastrados:
+        messages.success(request, f"{len(cadastrados)} feriado(s) nacional(is) de {ano} cadastrado(s).")
+    else:
+        messages.info(request, f"Os feriados nacionais de {ano} já estavam cadastrados.")
+    _avisar_feriado(request, resultado)
+    return redirect(f"{reverse('turmas:feriados')}?ano={ano}")
+
+
+@require_POST
+@perfil_requerido(PERFIL_ADMINISTRADOR)
+def feriado_remover(request, pk):
+    feriado = get_object_or_404(Feriado, pk=pk)
+    data, descricao = feriado.data, feriado.descricao
+    resultado = services.remover_feriado(feriado)
+    messages.success(request, f"Feriado de {data:%d/%m/%Y} ({descricao}) removido.")
+    _avisar_feriado(request, resultado)
+    return redirect(f"{reverse('turmas:feriados')}?ano={data.year}")

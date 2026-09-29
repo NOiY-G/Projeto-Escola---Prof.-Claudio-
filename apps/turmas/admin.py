@@ -1,7 +1,7 @@
 from django.contrib import admin
 
 from . import services
-from .models import Aula, Turma
+from .models import Aula, Feriado, Turma
 
 
 class AulaInline(admin.TabularInline):
@@ -30,4 +30,11 @@ class AulaAdmin(admin.ModelAdmin):
     list_filter = ["turma__curso"]
     search_fields = ["turma__codigo"]
     autocomplete_fields = ["turma"]
+    date_hierarchy = "data"
+
+
+@admin.register(Feriado)
+class FeriadoAdmin(admin.ModelAdmin):
+    list_display = ["data", "descricao"]
+    search_fields = ["descricao"]
     date_hierarchy = "data"

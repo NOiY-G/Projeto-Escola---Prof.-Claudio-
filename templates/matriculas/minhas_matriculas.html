@@ -18,9 +18,15 @@
             <p class="text-sm text-slate-600">Frequência: {{ matricula.percentual|percentual }} (mínimo {{ matricula.turma.curso.frequencia_minima }}%)</p>
           {% endif %}
         </div>
+        <div class="flex flex-col items-start gap-1 sm:items-end">
         <span class="text-sm font-medium {% if matricula.status == 'lista_espera' %}text-amber-700{% else %}text-slate-700{% endif %}">
           {{ matricula.get_status_display }}{% if matricula.posicao %} ({{ matricula.posicao }}º na fila){% endif %}
         </span>
+        {% if matricula.certificado %}
+          <a href="{% url 'certificados:pdf' matricula.certificado.codigo_validacao %}"
+             class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">Baixar certificado</a>
+        {% endif %}
+        </div>
       </li>
     {% empty %}
       <li class="p-4 text-slate-600">Você ainda não tem matrículas.</li>

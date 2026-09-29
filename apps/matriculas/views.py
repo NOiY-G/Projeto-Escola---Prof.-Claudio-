@@ -9,6 +9,7 @@ from django.views.decorators.http import require_POST
 from apps.contas.decorators import perfil_requerido
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO, PERFIL_INSTRUTOR
 from apps.turmas import services as turmas_services
+from apps.turmas.models import Turma
 
 from . import services
 from .forms import MatriculaForm
@@ -155,6 +156,7 @@ def chamada(request, turma_pk, aula_pk):
         "frequencias": services.resumo_frequencia(turma),
         "hoje": timezone.localdate(),
         "chamada_feita": aula.frequencias.exists(),
+        "encerrada": turma.status in (Turma.Status.CONCLUIDA, Turma.Status.CANCELADA),
         "erro": erro,
         "salva": salva,
     }

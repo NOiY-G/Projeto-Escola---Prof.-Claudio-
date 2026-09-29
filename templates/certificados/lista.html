@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Certificados · Cursos Livres{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+  <h1 class="text-2xl font-semibold">Certificados</h1>
+  <a href="{% url 'certificados:validar_busca' %}" class="rounded px-4 py-2 text-sm ring-1 ring-slate-300 hover:bg-white">Validar um certificado</a>
+</div>
+
+{% if pendentes %}
+  <h2 class="mb-2 text-lg font-semibold">Concluídos sem certificado</h2>
+  <div class="mb-6 overflow-hidden rounded-lg bg-white shadow">
+    <ul class="divide-y divide-slate-100">
+      {% for matricula in pendentes %}
+        <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="font-medium">{{ matricula.aluno.nome }}</p>
+            <p class="text-xs text-slate-500">{{ matricula.turma.codigo }} · {{ matricula.turma.curso.nome }}</p>
+          </div>
+          <form method="post" action="{% url 'certificados:emitir' matricula.pk %}">
+            {% csrf_token %}
+            <button class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">Emitir</button>
+          </form>
+        </li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<h2 class="mb-2 text-lg font-semibold">Emitidos recentemente</h2>
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for certificado in certificados %}
+      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="font-medium">{{ certificado.matricula.aluno.nome }}</p>
+          <p class="text-xs text-slate-500">{{ certificado.matricula.turma.curso.nome }} · {{ certificado.matricula.turma.codigo }} · emitido em {{ certificado.emitido_em|date:"d/m/Y" }}</p>
+        </div>
+        <div class="flex gap-3 text-sm">
+          <a href="{% url 'certificados:pdf' certificado.codigo_validacao %}" class="text-indigo-700 hover:underline">Baixar PDF</a>
+          <a href="{% url 'certificados:validar' certificado.codigo_validacao %}" class="text-indigo-700 hover:underline">Validação</a>
+        </div>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhum certificado emitido ainda.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

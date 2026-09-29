@@ -12,7 +12,10 @@
   <div class="flex flex-wrap items-center gap-3">
     {% include "turmas/_status.html" %}
     {% if total_aulas %}
-      <a href="{% url 'matriculas:chamada_inicio' turma.pk %}" class="rounded bg-indigo-700 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-800">Fazer chamada</a>
+      <a href="{% url 'matriculas:chamada_inicio' turma.pk %}" class="rounded bg-indigo-700 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-800">{% if turma.status == "concluida" or turma.status == "cancelada" %}Ver chamadas{% else %}Fazer chamada{% endif %}</a>
+    {% endif %}
+    {% if perfil == "administrador" and turma.status == "inscricoes_abertas" or perfil == "administrador" and turma.status == "em_andamento" %}
+      <a href="{% url 'certificados:concluir_turma' turma.pk %}" class="rounded px-3 py-1 text-sm ring-1 ring-slate-300 hover:bg-white">Concluir turma</a>
     {% endif %}
     {% if perfil == "administrador" %}
       <a href="{% url 'turmas:turma_editar' turma.pk %}" class="rounded px-3 py-1 text-sm ring-1 ring-slate-300 hover:bg-white">Editar</a>
@@ -50,6 +53,9 @@
           <p class="text-xs text-slate-500">{{ matricula.get_status_display }} · matrícula em {{ matricula.data|date:"d/m/Y" }}{% if aulas_realizadas %} · frequência {{ frequencias|valor_de:matricula.pk|percentual }}{% endif %}</p>
         </div>
         {% include "matriculas/_acoes.html" %}
+        {% if perfil == "administrador" and matricula.certificado %}
+          <a href="{% url 'certificados:pdf' matricula.certificado.codigo_validacao %}" class="text-sm text-indigo-700 hover:underline">Certificado (PDF)</a>
+        {% endif %}
       </li>
     {% empty %}
       <li class="p-4 text-slate-600">Nenhum aluno matriculado ainda.</li>

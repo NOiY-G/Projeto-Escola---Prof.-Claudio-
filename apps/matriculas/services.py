@@ -162,7 +162,7 @@ def matriculas_do_usuario(usuario):
     aluno = getattr(usuario, "aluno", None)
     if aluno is None:
         return Matricula.objects.none()
-    return aluno.matriculas.select_related("turma__curso").order_by("-data")
+    return aluno.matriculas.select_related("turma__curso", "certificado").order_by("-data")
 
 
 def filas_de_espera():
@@ -197,8 +197,14 @@ def aula_padrao(turma, hoje=None):
 
 
 def chamada_da_aula(aula):
-    """Linhas da chamada: cada matrícula ativa com a frequência já gravada (ou None)."""
-    gravadas = {f.matricula_id: f for f in aula.frequencias.all()}
+    """Linhas da chamada: cada matrícula ativa com a frequência já gravada (ou None).
+
+    Em turma encerrada não há mais matrículas ativas; mostramos quem tem registro.
+    """
+    gravadas = {f.matricula_id: f for f in aula.frequencias.select_related("matricula__aluno")}
+    if aula.turma.status in (Turma.Status.CONCLUIDA, Turma.Status.CANCELADA):
+        linhas = sorted(gravadas.values(), key=lambda f: f.matricula.aluno.nome)
+        return [(f.matricula, f) for f in linhas]
     return [(m, gravadas.get(m.pk)) for m in matriculas_da_chamada(aula.turma)]
 
 
@@ -221,14 +227,16 @@ def registrar_chamada(aula, presentes, observacoes=None, conteudo=None, hoje=Non
     hoje = hoje or timezone.localdate()
     if aula.data > hoje:
         raise MatriculaErro("Não é possível fazer a chamada de uma aula que ainda não aconteceu.")
-    if aula.turma.status in (Turma.Status.CONCLUIDA, Turma.Status.CANCELADA):
+    # Relê a turma travada: ela pode ter sido concluída depois que a tela abriu.
+    turma = Turma.objects.select_for_update().get(pk=aula.turma_id)
+    if turma.status in (Turma.Status.CONCLUIDA, Turma.Status.CANCELADA):
         raise MatriculaErro(
-            f"A turma está {aula.turma.get_status_display().lower()}; a chamada não pode mais ser alterada."
+            f"A turma está {turma.get_status_display().lower()}; a chamada não pode mais ser alterada."
         )
     presentes = {int(pk) for pk in presentes}
     observacoes = {int(pk): (texto or "").strip() for pk, texto in (observacoes or {}).items()}
 
-    matriculas = list(matriculas_da_chamada(aula.turma))
+    matriculas = list(matriculas_da_chamada(turma))
     desconhecidas = presentes - {m.pk for m in matriculas}
     if desconhecidas:
         raise MatriculaErro("A chamada tem alunos que não estão ativos nesta turma.")

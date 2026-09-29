@@ -103,3 +103,6 @@ EMAIL_BACKEND = os.environ.get(
     "DJANGO_EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend"
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "nao-responda@cursos.local")
+
+# Nome que aparece no cabeçalho dos certificados.
+NOME_INSTITUICAO = os.environ.get("NOME_INSTITUICAO", "Cursos Livres")

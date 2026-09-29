@@ -46,7 +46,7 @@ class TurmaDetailView(AdminOuInstrutorMixin, DetailView):
     def get_context_data(self, **kwargs):
         turma = self.object
         return super().get_context_data(
-            matriculas=turma.matriculas.select_related("aluno")
+            matriculas=turma.matriculas.select_related("aluno", "certificado")
             .exclude(status=Matricula.Status.LISTA_ESPERA)
             .order_by("status", "aluno__nome"),
             fila=matriculas_services.lista_espera(turma),

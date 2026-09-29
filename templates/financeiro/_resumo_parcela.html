@@ -1,0 +1,8 @@
+{% load formatos %}
+<dl class="grid gap-3 rounded-lg bg-slate-50 p-4 sm:grid-cols-2">
+  <div><dt class="text-xs uppercase text-slate-500">Aluno</dt><dd class="font-medium">{{ parcela.matricula.aluno.nome }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Curso</dt><dd>{{ parcela.matricula.turma.curso.nome }} ({{ parcela.matricula.turma.codigo }})</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Parcela</dt><dd>{{ parcela.numero }} · vence {{ parcela.vencimento|date:"d/m/Y" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Valor esperado</dt><dd class="text-lg font-semibold">{{ parcela.valor|reais }}</dd></div>
+  <div class="sm:col-span-2"><dt class="text-xs uppercase text-slate-500">Identificador no Pix (procure no extrato)</dt><dd class="font-mono">{{ parcela.identificador }}</dd></div>
+</dl>

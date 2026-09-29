@@ -80,7 +80,8 @@ def test_listar_cursos_com_filtro(cliente_admin, curso):
 def test_criar_curso(cliente_admin):
     resposta = cliente_admin.post(
         reverse("catalogo:curso_novo"),
-        {"nome": "Digitação", "carga_horaria": 20, "valor": "0", "frequencia_minima": 75, "ativo": "on"},
+        {"nome": "Digitação", "carga_horaria": 20, "valor": "0", "frequencia_minima": 75,
+         "parcelas_max": 1, "ativo": "on"},
     )
     assert resposta.status_code == 302
     assert Curso.objects.filter(nome="Digitação", ativo=True).exists()
@@ -99,7 +100,8 @@ def test_criar_curso_invalido(cliente_admin, curso):
 def test_editar_curso(cliente_admin, curso):
     resposta = cliente_admin.post(
         reverse("catalogo:curso_editar", args=[curso.pk]),
-        {"nome": "Informática Básica", "carga_horaria": 60, "valor": "99.90", "frequencia_minima": 80},
+        {"nome": "Informática Básica", "carga_horaria": 60, "valor": "99.90", "frequencia_minima": 80,
+         "parcelas_max": 3},
     )
     assert resposta.status_code == 302
     curso.refresh_from_db()

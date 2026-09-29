@@ -65,6 +65,20 @@ RELATORIOS = {
         ],
         "gerar": lambda turmas: (services.ocupacao(turmas), None),
     },
+    "financeiro": {
+        "titulo": "Financeiro",
+        "explicacao": "Por mês: o que entrou em Pix e em dinheiro (pela data do pagamento, sem "
+        "estornos), o previsto e o que ainda está em aberto (pelo vencimento das parcelas).",
+        "colunas": [
+            ("mes", "Mês", "texto"),
+            ("pix", "Pix", "moeda"),
+            ("dinheiro", "Dinheiro", "moeda"),
+            ("recebido", "Recebido", "moeda"),
+            ("previsto", "Previsto", "moeda"),
+            ("em_aberto", "Em aberto", "moeda"),
+        ],
+        "gerar": services.financeiro_por_mes,
+    },
 }
 
 

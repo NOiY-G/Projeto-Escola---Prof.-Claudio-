@@ -10,12 +10,14 @@ Definições usadas (mostradas também nas telas):
 import csv
 import datetime
 import io
+from decimal import Decimal
 from dataclasses import dataclass
 
 from django.db.models import Count, Q
 from django.utils import timezone
 
 from apps.catalogo.models import Curso
+from apps.financeiro.models import Pagamento, Parcela
 from apps.matriculas.models import Matricula
 from apps.turmas.models import Aula, Turma
 
@@ -172,6 +174,42 @@ def ocupacao(turmas):
     ]
 
 
+# Financeiro
+
+MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+
+
+def financeiro_por_mes(turmas):
+    """Por mês: recebido em Pix e em dinheiro, previsto e ainda em aberto (turmas filtradas)."""
+    zero = Decimal("0")
+    meses = {}
+
+    def linha(data):
+        chave = (data.year, data.month)
+        return meses.setdefault(
+            chave,
+            {"mes": f"{MESES[data.month - 1]}/{data.year}", "pix": zero, "dinheiro": zero,
+             "recebido": zero, "previsto": zero, "em_aberto": zero},
+        )
+
+    pagamentos = Pagamento.objects.filter(estornado_em__isnull=True, parcela__matricula__turma__in=turmas)
+    for data, forma, valor in pagamentos.values_list("data", "forma", "valor"):
+        item = linha(data)
+        item[forma] += valor
+        item["recebido"] += valor
+    parcelas = Parcela.objects.filter(matricula__turma__in=turmas).exclude(status=Parcela.Status.CANCELADA)
+    for vencimento, status, valor in parcelas.values_list("vencimento", "status", "valor"):
+        item = linha(vencimento)
+        item["previsto"] += valor
+        if status in (Parcela.Status.ABERTA, Parcela.Status.EM_ANALISE):
+            item["em_aberto"] += valor
+    linhas = [meses[chave] for chave in sorted(meses)]
+    total = {"mes": "Total"}
+    for campo in ("pix", "dinheiro", "recebido", "previsto", "em_aberto"):
+        total[campo] = sum((l[campo] for l in linhas), zero)
+    return linhas, total
+
+
 # Painel
 
 
@@ -210,6 +248,8 @@ def _celula(valor):
     """Formato brasileiro: decimal com vírgula; vazio para 'não se aplica'."""
     if valor is None:
         return ""
+    if isinstance(valor, Decimal):
+        return f"{valor:.2f}".replace(".", ",")
     if isinstance(valor, float):
         return f"{valor:.1f}".replace(".", ",")
     return valor

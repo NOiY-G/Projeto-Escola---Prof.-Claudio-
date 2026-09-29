@@ -12,7 +12,7 @@
         {{ campo }}<label for="{{ campo.id_for_label }}" class="text-sm">{{ campo.label }}</label>
       {% else %}
         <label for="{{ campo.id_for_label }}" class="text-sm font-medium">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
-        {% if campo.field.choices and campo.field.widget.allow_multiple_selected %}
+        {% if campo.field.widget.input_type == "radio" or campo.field.choices and campo.field.widget.allow_multiple_selected %}
           <div class="mt-2 flex flex-wrap gap-3">
             {% for opcao in campo %}<label class="flex items-center gap-1 text-sm">{{ opcao.tag }} {{ opcao.choice_label }}</label>{% endfor %}
           </div>

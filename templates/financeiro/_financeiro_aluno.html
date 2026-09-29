@@ -1,0 +1,58 @@
+{% load formatos %}
+<h2 id="financeiro" class="mt-6 mb-2 text-lg font-semibold">Financeiro</h2>
+{% for item in financeiro %}
+  <section class="mb-4 overflow-hidden rounded-lg bg-white shadow">
+    <header class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 p-3">
+      <div>
+        <p class="font-medium">{{ item.matricula.turma.curso.nome }} <span class="text-sm font-normal text-slate-500">({{ item.matricula.turma.codigo }})</span></p>
+        <p class="text-xs text-slate-500">
+          {{ item.matricula.turma.curso.valor|reais }}{% if item.matricula.desconto %} com {{ item.matricula.desconto|floatformat:"-2" }}% de desconto{% endif %}
+          em {{ item.parcelas|length }} parcela(s)
+          {% if item.situacao.em_aberto %} · <span class="text-red-700">{{ item.situacao.em_aberto|reais }} vencido</span>{% endif %}
+        </p>
+      </div>
+      {% include "financeiro/_situacao.html" with situacao=item.situacao %}
+    </header>
+    <ul class="divide-y divide-slate-100">
+      {% for parcela in item.parcelas %}
+        <li class="p-3">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <p class="text-sm"><strong>{{ parcela.numero }}ª</strong> · {{ parcela.valor|reais }} · vence {{ parcela.vencimento|date:"d/m/Y" }}</p>
+            <div class="flex flex-wrap items-center gap-2">
+              {% include "financeiro/_status_parcela.html" %}
+              {% if parcela.status == "aberta" %}
+                <a href="{% url 'financeiro:registrar' parcela.pk %}?next={{ request.path|urlencode }}%23financeiro" class="text-sm text-indigo-700 hover:underline">Registrar pagamento</a>
+              {% elif parcela.status == "em_analise" %}
+                <a href="{% url 'financeiro:conferir' parcela.comprovantes.all.0.pk %}" class="text-sm text-indigo-700 hover:underline">Conferir comprovante</a>
+              {% endif %}
+            </div>
+          </div>
+          {% for pagamento in parcela.pagamentos.all %}
+            <div class="mt-2 rounded bg-slate-50 p-2 text-xs {% if pagamento.estornado %}text-slate-400 line-through{% else %}text-slate-600{% endif %}">
+              {{ pagamento.get_forma_display }} em {{ pagamento.data|date:"d/m/Y" }}{% if pagamento.codigo_transacao %} · código {{ pagamento.codigo_transacao }}{% endif %}{% if pagamento.recebido_por %} · por {{ pagamento.recebido_por.username }}{% endif %}{% if pagamento.observacao %} · {{ pagamento.observacao }}{% endif %}
+            </div>
+            {% if pagamento.estornado %}
+              <p class="mt-1 text-xs text-red-700">Estornado em {{ pagamento.estornado_em|date:"d/m/Y H:i" }}: {{ pagamento.motivo_estorno }}</p>
+            {% else %}
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <a href="{% url 'financeiro:recibo' pagamento.pk %}" class="text-xs text-indigo-700 hover:underline">Recibo (PDF)</a>
+                <details class="text-xs">
+                  <summary class="cursor-pointer text-red-700">Estornar</summary>
+                  <form method="post" action="{% url 'financeiro:estornar' pagamento.pk %}" class="mt-2 flex flex-col gap-2 sm:flex-row"
+                        onsubmit="return confirm('Estornar este pagamento? A parcela volta a ficar em aberto.')">
+                    {% csrf_token %}
+                    <input type="hidden" name="next" value="{{ request.path }}#financeiro">
+                    <input name="motivo" required maxlength="200" placeholder="Motivo do estorno" class="rounded border border-slate-300 px-2 py-1">
+                    <button class="rounded px-2 py-1 text-red-700 ring-1 ring-red-200 hover:bg-red-50">Confirmar estorno</button>
+                  </form>
+                </details>
+              </div>
+            {% endif %}
+          {% endfor %}
+        </li>
+      {% endfor %}
+    </ul>
+  </section>
+{% empty %}
+  <p class="rounded-lg bg-white p-4 text-slate-600 shadow">Nenhuma cobrança: o aluno só tem cursos gratuitos ou matrículas sem parcelas.</p>
+{% endfor %}

@@ -18,11 +18,12 @@ cursos/            # projeto Django (settings, urls)
 apps/
   contas/          # usuários e perfis
   catalogo/        # Curso, Instrutor
-  turmas/          # Turma, Aula
+  turmas/          # Turma, Aula, Feriado
   alunos/          # Aluno
   matriculas/      # Matricula, Frequencia
   certificados/    # geração e validação de certificados
   relatorios/      # painéis e exportações
+  financeiro/      # Parcela, Pagamento, Comprovante
 templates/
 static/
 tests/
@@ -41,7 +42,7 @@ Usar grupos do Django:
 **Curso**
 - nome (único), descricao, carga_horaria (horas, inteiro > 0)
 - pre_requisitos (texto, opcional), valor (decimal, 0 = gratuito)
-- frequencia_minima (%, padrão 75), ativo (bool), criado_em
+- frequencia_minima (%, padrão 75), parcelas_max (1 a 12, padrão 1 = só à vista), ativo (bool), criado_em
 
 **Instrutor**
 - usuario (OneToOne User), nome, telefone, especialidades
@@ -53,7 +54,10 @@ Usar grupos do Django:
 
 **Aula**
 - turma (FK), data, conteudo (texto)
-- Gerar as aulas automaticamente a partir das datas e dias da semana da turma.
+- Gerar as aulas automaticamente a partir das datas e dias da semana da turma, pulando os feriados.
+
+**Feriado**
+- data (única), descricao. Dia sem aula para todas as turmas (também recesso e ponto facultativo).
 
 **Aluno**
 - usuario (OneToOne User, opcional), nome, cpf (único, validado), data_nascimento
@@ -61,6 +65,7 @@ Usar grupos do Django:
 
 **Matricula**
 - aluno (FK), turma (FK), data, status: `ativa | lista_espera | concluida | desistente | cancelada`
+- n_parcelas (padrão 1), desconto (%, 0 a 100; 100 = bolsa integral)
 - Único por (aluno, turma).
 
 **Frequencia**
@@ -69,6 +74,19 @@ Usar grupos do Django:
 
 **Certificado**
 - matricula (OneToOne), codigo_validacao (UUID), emitido_em
+
+**Parcela**
+- matricula (FK), numero, valor, vencimento, status: `aberta | em_analise | paga | cancelada`
+- Único por (matricula, numero). Identificador no Pix: `PARC` + id com 6 dígitos.
+
+**Pagamento**
+- parcela (FK), valor, data, forma: `pix | dinheiro`, codigo_transacao (Pix, opcional, único entre não estornados)
+- observacao, comprovante (OneToOne, opcional), recebido_por (User), registrado_em, estornado_em, motivo_estorno
+- Nunca é apagado: correção é por estorno.
+
+**Comprovante**
+- parcela (FK), arquivo (JPG, PNG ou PDF, até 5 MB, nome aleatório), tipo_conteudo, enviado_em, enviado_por
+- status: `em_analise | aprovado | recusado`, motivo_recusa, analisado_em, analisado_por
 
 ## Regras de negócio
 
@@ -79,6 +97,12 @@ Usar grupos do Django:
 5. Ao concluir a turma, matrículas ativas com frequência ≥ frequência mínima do curso viram `concluida` e ganham certificado. As demais viram `desistente`.
 6. O certificado em PDF traz nome do aluno, CPF parcialmente mascarado, curso, carga horária, período e um QR Code apontando para `/certificados/validar/<codigo>/`.
 7. A página de validação é pública e mostra apenas se o certificado é válido e seus dados básicos.
+8. As parcelas são geradas quando a matrícula fica ativa (na matrícula ou ao sair da fila): valor do curso − desconto, dividido em `n_parcelas` (até `parcelas_max` do curso; centavos que sobram vão para a última). A 1ª vence no início da turma (ou hoje, se já começou) e as demais a cada 30 dias. Curso gratuito ou bolsa integral não gera parcelas (isento).
+9. Cancelamento ou desistência cancelam as parcelas que ainda não venceram (as que vencem hoje inclusive). As vencidas continuam em aberto.
+10. Situação financeira da matrícula: `isento`, `em dia`, `pendente` (parcela vencida há até `TOLERANCIA_PAGAMENTO_DIAS`, padrão 7) ou `inadimplente` (vencida há mais que isso). Parcela com comprovante em análise não conta como vencida. O sistema só avisa (chamada, painel, ficha do aluno); não bloqueia.
+11. Só Pix e dinheiro. O pagamento quita a parcela inteira; data no futuro é recusada; o mesmo código de transação Pix não quita duas parcelas. Estorno exige motivo e devolve a parcela para `aberta`.
+12. O aluno paga pelo Pix "copia e cola" gerado pelo sistema (chave, valor e identificador da parcela, sem API) e envia o comprovante. A secretaria confere no extrato e aprova (vira pagamento Pix) ou recusa com motivo (o aluno vê o motivo e pode reenviar). Comprovantes só são acessíveis ao próprio aluno e à administração.
+13. O certificado não depende da situação financeira.
 
 ## Telas
 
@@ -90,7 +114,9 @@ Usar grupos do Django:
 - **Matrículas:** matricular aluno em turma, ver lista de espera
 - **Chamada:** instrutor escolhe a aula e marca presença de todos em uma tela só (HTMX)
 - **Certificados:** emitir, baixar PDF, validar
-- **Relatórios:** alunos por curso, taxa de conclusão, evasão e ocupação das turmas, com exportação em CSV
+- **Feriados:** cadastrar, remover e cadastrar os feriados nacionais do ano
+- **Pagamentos:** parcelas por filtro (comprovantes para conferir, vencidas, a vencer, pagas no mês), registrar pagamento, conferir comprovante; aba Financeiro na ficha do aluno (pagamentos, recibo, estorno); Pix e envio de comprovante em "Minhas matrículas"
+- **Relatórios:** alunos por curso, taxa de conclusão, evasão e ocupação das turmas, financeiro por mês (Pix, dinheiro, previsto, em aberto), com exportação em CSV
 
 Todas as telas devem funcionar bem no celular.
 

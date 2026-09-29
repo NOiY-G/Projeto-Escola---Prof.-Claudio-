@@ -25,6 +25,12 @@ class Curso(models.Model):
         default=75,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
     )
+    parcelas_max = models.PositiveSmallIntegerField(
+        "máximo de parcelas",
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+        help_text="1 = só à vista",
+    )
     ativo = models.BooleanField("ativo", default=True)
     criado_em = models.DateTimeField("criado em", auto_now_add=True)
 

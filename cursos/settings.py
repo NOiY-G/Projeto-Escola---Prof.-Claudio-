@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     "apps.matriculas",
     "apps.certificados",
     "apps.relatorios",
+    "apps.financeiro",
 ]
 
 MIDDLEWARE = [
@@ -106,3 +107,15 @@ DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "nao-responda@c
 
 # Nome que aparece no cabeçalho dos certificados.
 NOME_INSTITUICAO = os.environ.get("NOME_INSTITUICAO", "Cursos Livres")
+
+# Arquivos enviados (comprovantes). NÃO são servidos publicamente: só por views
+# que conferem a permissão de quem pede.
+MEDIA_ROOT = Path(os.environ.get("DJANGO_MEDIA_ROOT", BASE_DIR / "arquivos_privados"))
+
+# Financeiro
+TOLERANCIA_PAGAMENTO_DIAS = int(os.environ.get("TOLERANCIA_PAGAMENTO_DIAS", "7"))
+COMPROVANTE_TAMANHO_MAX_MB = 5
+# Dados do Pix da escola (aparecem para o aluno no QR Code).
+PIX_CHAVE = os.environ.get("PIX_CHAVE", "pix@exemplo.com")
+PIX_NOME_RECEBEDOR = os.environ.get("PIX_NOME_RECEBEDOR", "CURSOS LIVRES")
+PIX_CIDADE = os.environ.get("PIX_CIDADE", "BELEM")

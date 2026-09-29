@@ -9,6 +9,7 @@ from apps.catalogo.models import Curso
 from apps.catalogo.views import AdminMixin, FormPaginaMixin
 from apps.contas.decorators import PerfilRequeridoMixin, perfil_requerido
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_INSTRUTOR
+from apps.financeiro import services as financeiro
 from apps.matriculas import services as matriculas_services
 from apps.matriculas.models import Matricula
 
@@ -53,6 +54,7 @@ class TurmaDetailView(AdminOuInstrutorMixin, DetailView):
             .order_by("status", "aluno__nome"),
             fila=matriculas_services.lista_espera(turma),
             frequencias=matriculas_services.resumo_frequencia(turma),
+            situacoes=financeiro.situacoes(turma.matriculas.all()),
             total_aulas=turma.aulas.count(),
             aulas_realizadas=matriculas_services.aulas_realizadas(turma).count(),
             vagas_ocupadas=services.vagas_ocupadas(turma),

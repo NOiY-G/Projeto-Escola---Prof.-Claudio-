@@ -17,6 +17,8 @@ from apps.contas.services import (
     PERFIL_INSTRUTOR,
     perfil_do_usuario,
 )
+from apps.financeiro import services as financeiro
+from apps.financeiro.models import Comprovante
 from apps.matriculas.models import Frequencia, Matricula
 from apps.turmas.models import Turma
 
@@ -68,7 +70,7 @@ def test_popular_demo_respeita_as_regras(modo_dev):
     assert concluida.matriculas.filter(status=S.DESISTENTE).exists()
     assert Certificado.objects.count() == Matricula.objects.filter(status=S.CONCLUIDA).count() > 0
     # Turma em andamento: tem chamadas e uma desistência que chamou alguém da fila.
-    andamento = Turma.objects.get(status=Turma.Status.EM_ANDAMENTO)
+    andamento = Turma.objects.get(status=Turma.Status.EM_ANDAMENTO, curso__nome="Informática Básica")
     assert Frequencia.objects.filter(aula__turma=andamento).exists()
     assert andamento.matriculas.filter(status=S.DESISTENTE).count() == 1
     assert andamento.matriculas.filter(status=S.ATIVA).count() == andamento.vagas
@@ -128,3 +130,14 @@ def test_recusa_em_producao(settings):
     assert not Curso.objects.exists()
     _popular("--permitir-producao")
     assert Curso.objects.count() == 4
+
+
+def test_popular_demo_tem_cada_situacao_financeira(modo_dev):
+    _popular()
+    situacoes = {s.codigo for s in financeiro.situacoes(Matricula.objects.filter(status=S.ATIVA)).values()}
+    assert {"em_dia", "pendente", "inadimplente", "isento"} <= situacoes
+    assert Comprovante.objects.filter(status=Comprovante.Status.EM_ANALISE).count() == 1
+    assert Comprovante.objects.filter(status=Comprovante.Status.RECUSADO).count() == 1
+    # O aluno de login tem uma parcela em aberto para testar o Pix.
+    aluno = Aluno.objects.get(usuario__username="aluno")
+    assert aluno.matriculas.filter(parcelas__status="aberta").exists()

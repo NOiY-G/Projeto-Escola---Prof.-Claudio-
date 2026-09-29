@@ -1,0 +1,11 @@
+{% if parcela.status == "paga" %}
+  <span class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Paga</span>
+{% elif parcela.status == "em_analise" %}
+  <span class="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">Comprovante em análise</span>
+{% elif parcela.status == "cancelada" %}
+  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">Cancelada</span>
+{% elif parcela.vencimento < hoje %}
+  <span class="rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-800">Vencida</span>
+{% else %}
+  <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">A vencer</span>
+{% endif %}

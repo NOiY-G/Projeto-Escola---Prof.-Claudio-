@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load formatos %}
 {% block title %}Painel · Cursos Livres{% endblock %}
 {% block content %}
 <h1 class="text-2xl font-semibold">Olá, {{ user.first_name|default:user.username }}!</h1>
@@ -16,6 +17,15 @@
     {% include "contas/_indicador.html" with rotulo="Na lista de espera" valor=numeros.na_fila url=url_fila %}
     {% include "contas/_indicador.html" with rotulo="Matrículas" nota="últimos 7 dias" valor=numeros.matriculas_7_dias %}
     {% include "contas/_indicador.html" with rotulo="Aulas hoje" valor=numeros.aulas_hoje %}
+  </div>
+
+  <h2 class="mt-6 mb-2 text-lg font-semibold">Financeiro</h2>
+  <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    {% url 'financeiro:pagamentos' as url_pag %}
+    {% include "contas/_indicador.html" with rotulo="Comprovantes para conferir" valor=financeiro.comprovantes url=url_pag|add:"?ver=comprovantes" %}
+    {% include "contas/_indicador.html" with rotulo="Inadimplentes" nota="vencido há mais de "|add:tolerancia|add:" dias" valor=financeiro.inadimplentes url=url_pag|add:"?ver=vencidas" %}
+    {% include "contas/_indicador.html" with rotulo="Recebido" nota="este mês" valor=financeiro.recebido_mes|reais %}
+    {% include "contas/_indicador.html" with rotulo="A receber" nota="vencendo até o fim do mês" valor=financeiro.a_receber_mes|reais %}
   </div>
 
   <div class="mt-6 mb-2 flex items-center justify-between">

@@ -24,8 +24,9 @@ Acesse http://127.0.0.1:8000/ para o sistema e http://127.0.0.1:8000/admin/ para
 ### Dados de demonstração
 
 `python manage.py popular_demo` cria os cursos Informática Básica, Excel, Digitação e
-Internet Segura, dois instrutores, 30 alunos, os feriados nacionais e seis turmas (uma em
-cada situação), com matrículas, lista de espera, chamadas e certificados. As datas são relativas ao dia em que o
+Internet Segura, dois instrutores, 30 alunos, os feriados nacionais e sete turmas (todas as
+situações), com matrículas, lista de espera, chamadas, certificados e pagamentos (alunos em dia,
+pendentes, inadimplentes, bolsistas e um comprovante para conferir). As datas são relativas ao dia em que o
 comando roda.
 
 | Usuário | Perfil |
@@ -33,7 +34,7 @@ comando roda.
 | `admin` | Administrador |
 | `maria` | Instrutora (Informática Básica, Internet Segura) |
 | `carlos` | Instrutor (Excel, Digitação) |
-| `aluno` | Aluno com certificado e matrícula ativa |
+| `aluno` | Aluno com certificado, matrícula ativa e uma parcela para pagar com Pix |
 
 A senha de todos é `demo1234` (troque com `--senha`). Se o banco já tiver dados, o comando
 para; use `--limpar` para apagar cursos, turmas, alunos, matrículas e certificados e recriar
@@ -55,9 +56,21 @@ pytest
 | `DJANGO_SECRET_KEY` | Chave secreta |
 | `DJANGO_DEBUG` | `0` em produção |
 | `DJANGO_ALLOWED_HOSTS` | Hosts separados por vírgula |
-| `NOME_INSTITUICAO` | Nome no topo dos certificados (padrão: `Cursos Livres`) |
+| `NOME_INSTITUICAO` | Nome no topo dos certificados e recibos (padrão: `Cursos Livres`) |
+| `PIX_CHAVE` | Chave Pix da escola, usada no QR Code das parcelas (padrão de exemplo: `pix@exemplo.com`) |
+| `PIX_NOME_RECEBEDOR` | Nome do recebedor que aparece no app do banco (até 25 letras) |
+| `PIX_CIDADE` | Cidade do recebedor (até 15 letras) |
+| `TOLERANCIA_PAGAMENTO_DIAS` | Dias depois do vencimento até o aluno virar inadimplente (padrão: 7) |
+| `DJANGO_MEDIA_ROOT` | Pasta dos comprovantes enviados (padrão: `arquivos_privados/`) |
 | `DJANGO_EMAIL_BACKEND` | Backend de e-mail para a recuperação de senha (padrão: console) |
 | `DJANGO_DEFAULT_FROM_EMAIL` | Remetente dos e-mails |
+
+Os comprovantes enviados pelos alunos ficam em `DJANGO_MEDIA_ROOT` e **não são servidos
+publicamente**: só abrem pela aplicação, para o próprio aluno e a administração. Em produção,
+use uma pasta que não se perca entre atualizações e inclua-a no backup.
+
+**Antes de usar de verdade, configure `PIX_CHAVE`, `PIX_NOME_RECEBEDOR` e `PIX_CIDADE`** com os
+dados da conta da escola; os valores padrão são só de exemplo.
 
 O QR Code do certificado aponta para o domínio pelo qual o sistema foi acessado ao baixar o
 PDF; em produção, acesse pelo domínio definitivo.

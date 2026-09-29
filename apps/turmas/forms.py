@@ -3,7 +3,7 @@ from django import forms
 from apps.catalogo.models import Curso
 from apps.contas.forms import DataInput, EstiloTailwindMixin, HoraInput
 
-from .models import DIAS_SEMANA, Turma
+from .models import DIAS_SEMANA, Feriado, Turma
 
 
 class TurmaForm(EstiloTailwindMixin, forms.ModelForm):
@@ -46,3 +46,11 @@ class TurmaForm(EstiloTailwindMixin, forms.ModelForm):
         # Guarda na ordem da semana, ex.: "seg,qua".
         escolhidos = set(self.cleaned_data["dias_semana"])
         return ",".join(codigo for codigo, _ in DIAS_SEMANA if codigo in escolhidos)
+
+
+class FeriadoForm(EstiloTailwindMixin, forms.ModelForm):
+    class Meta:
+        model = Feriado
+        fields = ["data", "descricao"]
+        widgets = {"data": DataInput}
+        labels = {"descricao": "Descrição"}

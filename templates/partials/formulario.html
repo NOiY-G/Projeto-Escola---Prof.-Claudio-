@@ -5,7 +5,7 @@
   </div>
 {% endif %}
 {% for campo in form.hidden_fields %}{{ campo }}{% endfor %}
-<div class="grid gap-4 sm:grid-cols-2">
+<div class="grid gap-4 {% if not uma_coluna %}sm:grid-cols-2{% endif %}">
   {% for campo in form.visible_fields %}
     <div class="{% if campo.field.widget.input_type == 'checkbox' and not campo.field.choices %}flex items-center gap-2{% endif %}{% if campo.field.widget.attrs.rows %} sm:col-span-2{% endif %}">
       {% if campo.field.widget.input_type == "checkbox" and not campo.field.choices %}

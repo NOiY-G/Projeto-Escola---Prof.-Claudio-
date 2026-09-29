@@ -42,6 +42,19 @@ tudo. Ele se recusa a rodar com `DJANGO_DEBUG=0`.
 
 Sem os dados de demonstração, crie um administrador com `python manage.py createsuperuser`.
 
+## Executável para apresentação (Windows)
+
+O GitHub monta um executável que não precisa de Python instalado: ele sobe o sistema com os
+dados de demonstração, funciona sem internet e abre o navegador. Para baixar, abra a aba
+**Actions** do repositório → **Executável de apresentação (Windows)** → a execução mais
+recente com ✓ → **Artifacts** → `CursosLivres-Apresentacao-Windows`. As instruções de uso estão
+no `LEIA-ME.txt` dentro do pacote.
+
+A montagem roda sozinha quando o código muda (e pode ser disparada à mão, em "Run workflow").
+Antes de publicar o pacote, o próprio executável é testado: sobe o sistema, abre as telas de
+cada perfil e gera um certificado em PDF. Sem empacotar, o mesmo lançador roda com
+`python apresentacao/iniciar.py` (e `--teste` para só conferir).
+
 ## Testes
 
 ```bash

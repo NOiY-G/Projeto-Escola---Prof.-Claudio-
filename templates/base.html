@@ -12,13 +12,13 @@
   <header class="bg-indigo-700 text-white">
     <nav class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
       <a href="{% url 'contas:painel' %}" class="text-lg font-semibold">Cursos Livres</a>
-      <details class="relative sm:hidden">
+      <details class="relative lg:hidden">
         <summary class="cursor-pointer list-none rounded px-3 py-1 ring-1 ring-white/40">Menu</summary>
         <div class="absolute right-0 z-10 mt-2 w-48 rounded bg-white py-2 text-slate-800 shadow">
           {% include "partials/menu.html" with classe="block px-4 py-2 hover:bg-slate-100" %}
         </div>
       </details>
-      <div class="hidden items-center gap-4 sm:flex">
+      <div class="hidden items-center gap-4 lg:flex">
         {% include "partials/menu.html" with classe="hover:underline" %}
       </div>
     </nav>

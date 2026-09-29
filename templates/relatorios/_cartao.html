@@ -1,0 +1,43 @@
+{% load formatos l10n %}
+{% comment %}
+Uma linha do relatório em formato de cartão (celular): as colunas de texto viram
+título e subtítulo; os números, uma grade de rótulo/valor; o medidor, uma barra larga.
+{% endcomment %}
+<div class="rounded-lg bg-white p-4 shadow {% if destaque %}ring-2 ring-slate-300{% endif %}">
+  {% for chave, titulo, tipo in relatorio.colunas %}
+    {% if forloop.first %}
+      <p class="font-semibold">{{ linha|valor_de:chave }}</p>
+    {% elif tipo == "texto" %}
+      {% with valor=linha|valor_de:chave %}{% if valor %}<p class="text-sm text-slate-600">{{ valor }}</p>{% endif %}{% endwith %}
+    {% endif %}
+  {% endfor %}
+
+  {% for chave, titulo, tipo in relatorio.colunas %}
+    {% if tipo == "medidor" %}
+      {% with valor=linha|valor_de:chave %}
+        <div class="mt-3" title="{{ linha.ocupadas }} de {{ linha.vagas }} vagas">
+          <div class="mb-1 flex justify-between text-sm">
+            <span class="text-slate-600">{{ titulo }}</span>
+            <span class="font-semibold">{{ valor|percentual }}</span>
+          </div>
+          <div class="h-2 overflow-hidden rounded-full bg-[#cde2fb]" aria-hidden="true">
+            <div class="h-2 rounded-full bg-[#2a78d6]" style="width: {{ linha.barra|unlocalize }}%"></div>
+          </div>
+        </div>
+      {% endwith %}
+    {% endif %}
+  {% endfor %}
+
+  <dl class="mt-3 grid grid-cols-3 gap-x-3 gap-y-2">
+    {% for chave, titulo, tipo in relatorio.colunas %}
+      {% if tipo == "numero" or tipo == "pct" %}
+        {% with valor=linha|valor_de:chave %}
+          <div>
+            <dt class="text-xs text-slate-500">{{ titulo }}</dt>
+            <dd class="tabular-nums">{% if tipo == "pct" %}{{ valor|percentual }}{% else %}{{ valor }}{% endif %}</dd>
+          </div>
+        {% endwith %}
+      {% endif %}
+    {% endfor %}
+  </dl>
+</div>

@@ -1,0 +1,6 @@
+{% comment %}Bloco de indicador: rótulo + valor (+ nota), opcionalmente clicável.{% endcomment %}
+{% if url %}<a href="{{ url }}" class="block rounded-lg bg-white p-4 shadow ring-indigo-200 hover:ring-2">{% else %}<div class="rounded-lg bg-white p-4 shadow">{% endif %}
+  <p class="text-sm text-slate-600">{{ rotulo }}</p>
+  <p class="mt-1 text-3xl font-semibold text-slate-900">{{ valor }}</p>
+  {% if nota %}<p class="text-xs text-slate-500">{{ nota }}</p>{% endif %}
+{% if url %}</a>{% else %}</div>{% endif %}

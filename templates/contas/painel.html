@@ -6,6 +6,39 @@
   {% if perfil %}Perfil: {{ perfil|capfirst }}{% else %}Seu usuário ainda não tem perfil atribuído. Procure a administração.{% endif %}
 </p>
 
+{% if perfil == "administrador" %}
+  <h2 class="sr-only">Números do dia</h2>
+  <div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
+    {% url 'turmas:turma_lista' as url_turmas %}
+    {% include "contas/_indicador.html" with rotulo="Turmas em andamento" valor=numeros.turmas_em_andamento url=url_turmas|add:"?status=em_andamento" %}
+    {% include "contas/_indicador.html" with rotulo="Vagas livres" nota="em inscrições abertas" valor=numeros.vagas_livres url=url_turmas|add:"?status=inscricoes_abertas" %}
+    {% url 'matriculas:lista_espera' as url_fila %}
+    {% include "contas/_indicador.html" with rotulo="Na lista de espera" valor=numeros.na_fila url=url_fila %}
+    {% include "contas/_indicador.html" with rotulo="Matrículas" nota="últimos 7 dias" valor=numeros.matriculas_7_dias %}
+    {% include "contas/_indicador.html" with rotulo="Aulas hoje" valor=numeros.aulas_hoje %}
+  </div>
+
+  <div class="mt-6 mb-2 flex items-center justify-between">
+    <h2 class="text-lg font-semibold">Matrículas recentes</h2>
+    <a href="{% url 'relatorios:inicio' %}" class="text-sm text-indigo-700 hover:underline">Ver relatórios →</a>
+  </div>
+  <div class="overflow-hidden rounded-lg bg-white shadow">
+    <ul class="divide-y divide-slate-100">
+      {% for matricula in numeros.recentes %}
+        <li class="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <a href="{% url 'alunos:aluno_detalhe' matricula.aluno.pk %}" class="font-medium hover:underline">{{ matricula.aluno.nome }}</a>
+            <p class="text-xs text-slate-500">{{ matricula.turma.codigo }} · {{ matricula.turma.curso.nome }} · {{ matricula.data|date:"d/m/Y H:i" }}</p>
+          </div>
+          <span class="text-sm text-slate-600">{{ matricula.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="p-4 text-slate-600">Nenhuma matrícula ainda.</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
 {% if perfil == "instrutor" %}
   <h2 class="mt-6 mb-2 text-lg font-semibold">Aulas de hoje</h2>
   <div class="overflow-hidden rounded-lg bg-white shadow">

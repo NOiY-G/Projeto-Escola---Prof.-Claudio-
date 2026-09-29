@@ -1,0 +1,36 @@
+CURSOS LIVRES - APRESENTAÇÃO
+============================
+
+COMO ABRIR
+1. Extraia o .zip inteiro para uma pasta (por exemplo, na Área de Trabalho).
+   Não rode direto de dentro do .zip.
+2. Dê dois cliques em "Iniciar apresentacao.exe".
+3. Na primeira vez, o Windows pode mostrar:
+   - "O Windows protegeu o computador": clique em "Mais informações" e
+     depois em "Executar assim mesmo" (o programa não tem assinatura digital).
+   - O Firewall pedindo permissão: marque "Redes privadas" e clique em
+     "Permitir acesso". Isso deixa os celulares da sala abrirem o sistema.
+4. O navegador abre sozinho. Se não abrir, use o endereço que aparece
+   na janela preta.
+
+USUÁRIOS (senha de todos: demo1234)
+  admin   Administrador: cadastros, matrículas, pagamentos, relatórios
+  maria   Instrutora: aulas de hoje e chamada
+  carlos  Instrutor
+  aluno   Aluno: minhas matrículas, Pix, comprovante e certificado
+
+CELULAR
+Com o computador e o celular na mesma rede Wi-Fi, abra no celular o
+endereço que aparece na janela (http://192.168...:8000). Assim o QR Code
+do certificado também abre no celular.
+
+DADOS
+A cada vez que o programa abre, os dados de demonstração são recriados
+com as datas do dia. O que você mudar durante a apresentação se perde ao
+fechar. Para continuar de onde parou, abra pelo terminal com:
+    "Iniciar apresentacao.exe" --manter-dados
+
+PARA ENCERRAR
+Feche a janela preta.
+
+Funciona sem internet.

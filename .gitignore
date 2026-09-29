@@ -6,3 +6,6 @@ staticfiles/
 .pytest_cache/
 .env
 arquivos_privados/
+.apresentacao/
+build/
+dist/

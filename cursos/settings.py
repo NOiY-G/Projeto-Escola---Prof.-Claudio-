@@ -105,6 +105,9 @@ EMAIL_BACKEND = os.environ.get(
 )
 DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "nao-responda@cursos.local")
 
+# Tailwind e HTMX pela internet (padrão) ou pelas cópias em static/vendor/ (sem internet).
+USAR_CDN = os.environ.get("USAR_CDN", "1") == "1"
+
 # Nome que aparece no cabeçalho dos certificados.
 NOME_INSTITUICAO = os.environ.get("NOME_INSTITUICAO", "Cursos Livres")
 

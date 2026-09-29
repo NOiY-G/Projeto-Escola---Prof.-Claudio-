@@ -1,0 +1,88 @@
+name: Executável de apresentação (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, "claude/**"]
+    paths:
+      - "apresentacao/**"
+      - "apps/**"
+      - "cursos/**"
+      - "templates/**"
+      - "static/**"
+      - "requirements.txt"
+      - ".github/workflows/executavel.yml"
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      # Pango/GTK para o WeasyPrint gerar os PDFs (certificado e recibo).
+      - uses: msys2/setup-msys2@v2
+        id: msys2
+        with:
+          msystem: MINGW64
+          update: false
+          install: mingw-w64-x86_64-pango
+
+      - name: Separar as bibliotecas do PDF
+        shell: pwsh
+        run: |
+          $mingw = Join-Path "${{ steps.msys2.outputs.msys2-location }}" "mingw64"
+          $gtk = Join-Path $env:RUNNER_TEMP "gtk"
+          New-Item -ItemType Directory -Force "$gtk/bin", "$gtk/etc" | Out-Null
+          Copy-Item "$mingw/bin/*.dll" "$gtk/bin/"
+          Copy-Item -Recurse "$mingw/etc/fonts" "$gtk/etc/fonts"
+          "GTK_DIR=$gtk" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+          Get-ChildItem "$gtk/bin" | Measure-Object -Property Length -Sum |
+            ForEach-Object { "{0} DLLs, {1:N0} MB" -f $_.Count, ($_.Sum / 1MB) }
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pyinstaller
+
+      - name: Empacotar
+        run: pyinstaller --noconfirm --log-level WARN apresentacao/cursos_livres.spec
+
+      # Roda o próprio executável: sobe o sistema, abre as telas e gera um certificado.
+      # Falha também se aparecer erro de fontes (a mensagem apareceria na apresentação).
+      - name: Testar o executável
+        shell: cmd
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          "dist\CursosLivres-Apresentacao\Iniciar apresentacao.exe" --teste --porta 8123 > teste.txt 2>&1
+          set CODIGO=%ERRORLEVEL%
+          type teste.txt
+          if not "%CODIGO%"=="0" exit /b %CODIGO%
+          findstr /C:"Fontconfig error" teste.txt && (echo ERRO: as fontes do PDF nao foram configuradas & exit /b 1)
+          exit /b 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: certificado-gerado-no-teste
+          path: dist/CursosLivres-Apresentacao/dados-da-apresentacao/certificado-teste.pdf
+          retention-days: 7
+
+      - name: Tirar os dados do teste do pacote
+        shell: pwsh
+        run: Remove-Item -Recurse -Force "dist/CursosLivres-Apresentacao/dados-da-apresentacao"
+
+      - name: Incluir as instruções
+        shell: pwsh
+        run: Copy-Item apresentacao/LEIA-ME.txt dist/CursosLivres-Apresentacao/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CursosLivres-Apresentacao-Windows
+          path: dist/CursosLivres-Apresentacao
+          retention-days: 30

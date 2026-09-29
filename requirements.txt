@@ -1,0 +1,7 @@
+Django>=5.2,<6
+dj-database-url>=2.2
+psycopg[binary]>=3.2
+pytest>=8
+pytest-django>=4.9
+weasyprint>=62
+qrcode[pil]>=7.4

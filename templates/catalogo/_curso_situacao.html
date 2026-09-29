@@ -1,0 +1,7 @@
+<button type="button" id="curso-{{ curso.pk }}-situacao"
+        hx-post="{% url 'catalogo:curso_alternar_ativo' curso.pk %}"
+        hx-swap="outerHTML"
+        title="Clique para {% if curso.ativo %}desativar{% else %}ativar{% endif %}"
+        class="rounded-full px-2 py-0.5 text-xs font-medium {% if curso.ativo %}bg-green-100 text-green-800{% else %}bg-slate-200 text-slate-600{% endif %}">
+  {% if curso.ativo %}Ativo{% else %}Inativo{% endif %}
+</button>

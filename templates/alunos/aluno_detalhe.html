@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% load formatos %}
+{% block title %}{{ aluno.nome }} · Cursos Livres{% endblock %}
+{% block content %}
+<a href="{% url 'alunos:aluno_lista' %}" class="text-sm text-indigo-700 hover:underline">← Alunos</a>
+
+<div class="mt-2 mb-4 flex flex-wrap items-start justify-between gap-2">
+  <h1 class="text-2xl font-semibold">{{ aluno.nome }}</h1>
+  <a href="{% url 'alunos:aluno_editar' aluno.pk %}" class="rounded px-3 py-1 text-sm ring-1 ring-slate-300 hover:bg-white">Editar</a>
+</div>
+
+<dl class="grid gap-3 rounded-lg bg-white p-4 shadow sm:grid-cols-3">
+  <div><dt class="text-xs uppercase text-slate-500">CPF</dt><dd>{{ aluno.cpf|cpf }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Nascimento</dt><dd>{{ aluno.data_nascimento|date:"d/m/Y" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Escolaridade</dt><dd>{{ aluno.get_escolaridade_display|default:"—" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Telefone</dt><dd>{{ aluno.telefone|default:"—" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">E-mail</dt><dd class="break-all">{{ aluno.email|default:"—" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Endereço</dt><dd>{{ aluno.endereco|default:"—" }}</dd></div>
+</dl>
+
+<div class="mt-6 mb-2 flex flex-wrap items-center justify-between gap-2">
+  <h2 class="text-lg font-semibold">Histórico de cursos</h2>
+  <a href="{% url 'matriculas:matricula_nova' %}?aluno={{ aluno.pk }}&voltar={{ request.path|urlencode }}"
+     class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">+ Matricular em turma</a>
+</div>
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for matricula in historico %}
+      <li class="flex flex-col gap-1 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <a href="{% url 'turmas:turma_detalhe' matricula.turma.pk %}" class="font-medium text-indigo-700 hover:underline">{{ matricula.turma.curso.nome }}</a>
+          <p class="text-xs text-slate-500">Turma {{ matricula.turma.codigo }} · {{ matricula.turma.data_inicio|date:"d/m/Y" }} a {{ matricula.turma.data_fim|date:"d/m/Y" }}</p>
+        </div>
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="text-sm text-slate-600">{{ matricula.get_status_display }}</span>
+          {% include "matriculas/_acoes.html" %}
+        </div>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Este aluno ainda não se matriculou em nenhum curso.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

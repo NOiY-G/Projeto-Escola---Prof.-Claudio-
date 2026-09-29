@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+<meta charset="utf-8">
+<title>Certificado – {{ nome }}</title>
+<style>
+  @page { size: A4 landscape; margin: 0; }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "DejaVu Sans", Arial, sans-serif; color: #1e293b; }
+  .folha { position: relative; width: 297mm; height: 210mm; padding: 14mm; }
+  .moldura { height: 100%; border: 3px solid #4338ca; padding: 5mm; }
+  .interna { position: relative; height: 100%; border: 1px solid #a5b4fc; padding: 14mm 20mm; text-align: center; }
+  .instituicao { font-size: 13pt; letter-spacing: 3px; text-transform: uppercase; color: #4338ca; }
+  h1 { margin: 5mm 0 2mm; font-size: 40pt; font-weight: normal; letter-spacing: 6px; color: #312e81; }
+  .subtitulo { font-size: 12pt; color: #64748b; margin-bottom: 8mm; }
+  .texto { font-size: 15pt; line-height: 1.7; margin: 0 auto; max-width: 215mm; }
+  .nome { display: block; font-size: 26pt; font-weight: bold; color: #0f172a; margin: 3mm 0; }
+  .rodape { position: absolute; left: 20mm; right: 20mm; bottom: 12mm; text-align: left; }
+  .emissao { font-size: 11pt; }
+  .validacao { position: absolute; right: 0; bottom: 0; width: 95mm; text-align: right; font-size: 8pt; color: #475569; }
+  .validacao img { width: 26mm; height: 26mm; display: block; margin: 0 0 2mm auto; }
+  .codigo { font-family: "DejaVu Sans Mono", monospace; font-size: 7.5pt; word-break: break-all; }
+</style>
+</head>
+<body>
+<div class="folha"><div class="moldura"><div class="interna">
+  <div class="instituicao">{{ instituicao }}</div>
+  <h1>CERTIFICADO</h1>
+  <div class="subtitulo">de conclusão de curso livre</div>
+
+  <p class="texto">
+    Certificamos que
+    <span class="nome">{{ nome }}</span>
+    CPF {{ cpf_mascarado }}, concluiu o curso livre de <strong>{{ curso }}</strong>,
+    com carga horária de <strong>{{ carga_horaria }} hora{{ carga_horaria|pluralize }}</strong>,
+    realizado de {{ data_inicio|date:"d/m/Y" }} a {{ data_fim|date:"d/m/Y" }} (turma {{ turma }}).
+  </p>
+
+  <div class="rodape">
+    <div class="emissao">Emitido em {{ emitido_em|date:"j \d\e F \d\e Y"|lower }}.</div>
+    <div class="validacao">
+      <img src="{{ qr_code }}" alt="QR Code de validação">
+      Confira a autenticidade em<br>{{ url_validacao }}<br>
+      <span class="codigo">Código: {{ codigo }}</span>
+    </div>
+  </div>
+</div></div></div>
+</body>
+</html>

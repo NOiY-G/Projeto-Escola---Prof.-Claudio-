@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% load formatos %}
+{% block title %}Concluir {{ turma.codigo }} · Cursos Livres{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-3xl">
+  <a href="{% url 'turmas:turma_detalhe' turma.pk %}" class="text-sm text-indigo-700 hover:underline">← {{ turma.codigo }}</a>
+  <h1 class="mt-2 text-2xl font-semibold">Concluir turma {{ turma.codigo }}</h1>
+  <p class="mb-4 text-slate-600">{{ turma.curso.nome }} · frequência mínima {{ turma.curso.frequencia_minima }}%</p>
+
+  {% if erro %}
+    <p class="rounded-lg bg-red-50 p-4 text-red-700">{{ erro }}</p>
+  {% else %}
+    <p class="mb-4 rounded-lg bg-amber-50 p-4 text-sm text-amber-900">
+      Confira o resultado abaixo. Ao concluir, quem atingiu a frequência mínima fica com a matrícula
+      <strong>concluída</strong> e recebe certificado; os demais ficam como <strong>desistentes</strong>.
+      {% if na_fila %}As {{ na_fila }} matrícula(s) da lista de espera serão canceladas.{% endif %}
+      Depois disso a chamada não pode mais ser alterada.
+    </p>
+
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <ul class="divide-y divide-slate-100">
+        {% for linha in linhas %}
+          <li class="flex items-center justify-between gap-2 p-3">
+            <span class="font-medium">{{ linha.matricula.aluno.nome }}</span>
+            <span class="text-right text-sm">
+              <span class="text-slate-600">{{ linha.percentual|percentual }}</span>
+              {% if linha.aprovado %}
+                <span class="ml-2 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">Conclui</span>
+              {% else %}
+                <span class="ml-2 rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">Desistente</span>
+              {% endif %}
+            </span>
+          </li>
+        {% empty %}
+          <li class="p-4 text-slate-600">Nenhuma matrícula ativa.</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <form method="post" class="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end"
+          onsubmit="return confirm('Concluir a turma {{ turma.codigo }}? Esta ação não pode ser desfeita.')">
+      {% csrf_token %}
+      <a href="{% url 'turmas:turma_detalhe' turma.pk %}" class="rounded px-4 py-2 text-center ring-1 ring-slate-300 hover:bg-white">Voltar</a>
+      <button class="rounded bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800">Concluir turma e emitir certificados</button>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

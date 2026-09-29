@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Turmas · Cursos Livres{% endblock %}
+{% block content %}
+{% if perfil == "administrador" %}{% url 'turmas:turma_nova' as novo_url %}{% endif %}
+{% include "partials/cabecalho_lista.html" with titulo="Turmas" novo_rotulo="Nova turma" %}
+
+<form method="get" class="mb-4 grid gap-2 sm:grid-cols-4">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Código"
+         class="rounded border border-slate-300 px-3 py-2">
+  <select name="status" class="rounded border border-slate-300 px-3 py-2">
+    <option value="">Todos os status</option>
+    {% for valor, rotulo in status_opcoes %}
+      <option value="{{ valor }}" {% if request.GET.status == valor %}selected{% endif %}>{{ rotulo }}</option>
+    {% endfor %}
+  </select>
+  <select name="curso" class="rounded border border-slate-300 px-3 py-2">
+    <option value="">Todos os cursos</option>
+    {% for curso in cursos %}
+      <option value="{{ curso.pk }}" {% if request.GET.curso == curso.pk|stringformat:"d" %}selected{% endif %}>{{ curso.nome }}</option>
+    {% endfor %}
+  </select>
+  <button class="rounded px-4 py-2 ring-1 ring-slate-300 hover:bg-white">Filtrar</button>
+</form>
+
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for turma in object_list %}
+      <li>
+        <a href="{% url 'turmas:turma_detalhe' turma.pk %}" class="flex flex-col gap-1 p-4 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p class="font-medium">{{ turma.codigo }} · {{ turma.curso.nome }}</p>
+            <p class="text-sm text-slate-600">
+              {{ turma.data_inicio|date:"d/m/Y" }} a {{ turma.data_fim|date:"d/m/Y" }} ·
+              {{ turma.horario_display }} · {{ turma.instrutor.nome }}
+            </p>
+          </div>
+          {% include "turmas/_status.html" %}
+        </a>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhuma turma encontrada.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% include "partials/paginacao.html" %}
+{% endblock %}

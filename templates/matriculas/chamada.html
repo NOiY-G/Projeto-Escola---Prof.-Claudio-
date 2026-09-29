@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}Chamada {{ turma.codigo }} · Cursos Livres{% endblock %}
+{% block content %}
+<a href="{% url 'turmas:turma_detalhe' turma.pk %}" class="text-sm text-indigo-700 hover:underline">← {{ turma.codigo }}</a>
+<h1 class="mt-2 text-2xl font-semibold">Chamada</h1>
+<p class="mb-4 text-slate-600">{{ turma.curso.nome }} · {{ turma.horario_display }}</p>
+
+<label for="escolher-aula" class="text-sm font-medium">Aula</label>
+<select id="escolher-aula" onchange="window.location.href = this.value"
+        class="mt-1 mb-4 w-full rounded border border-slate-300 bg-white px-3 py-2">
+  {% for opcao in aulas %}
+    <option value="{% url 'matriculas:chamada' turma.pk opcao.pk %}" {% if opcao.pk == aula.pk %}selected{% endif %}>
+      {{ opcao.data|date:"d/m/Y" }} ({{ opcao.data|date:"D" }}){% if opcao.data == hoje %} · hoje{% elif opcao.data > hoje %} · futura{% elif opcao.registros %} · ✓ feita{% else %} · pendente{% endif %}
+    </option>
+  {% endfor %}
+</select>
+
+{% include "matriculas/_chamada_form.html" %}
+{% endblock %}

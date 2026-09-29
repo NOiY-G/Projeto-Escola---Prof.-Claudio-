@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load formatos %}
+{% block title %}{{ turma.codigo }} · Cursos Livres{% endblock %}
+{% block content %}
+<a href="{% url 'turmas:turma_lista' %}" class="text-sm text-indigo-700 hover:underline">← Turmas</a>
+
+<div class="mt-2 mb-4 flex flex-wrap items-start justify-between gap-2">
+  <div>
+    <h1 class="text-2xl font-semibold">{{ turma.codigo }}</h1>
+    <p class="text-slate-600">{{ turma.curso.nome }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-3">
+    {% include "turmas/_status.html" %}
+    {% if total_aulas %}
+      <a href="{% url 'matriculas:chamada_inicio' turma.pk %}" class="rounded bg-indigo-700 px-3 py-1 text-sm font-medium text-white hover:bg-indigo-800">{% if turma.status == "concluida" or turma.status == "cancelada" %}Ver chamadas{% else %}Fazer chamada{% endif %}</a>
+    {% endif %}
+    {% if perfil == "administrador" and turma.status == "inscricoes_abertas" or perfil == "administrador" and turma.status == "em_andamento" %}
+      <a href="{% url 'certificados:concluir_turma' turma.pk %}" class="rounded px-3 py-1 text-sm ring-1 ring-slate-300 hover:bg-white">Concluir turma</a>
+    {% endif %}
+    {% if perfil == "administrador" %}
+      <a href="{% url 'turmas:turma_editar' turma.pk %}" class="rounded px-3 py-1 text-sm ring-1 ring-slate-300 hover:bg-white">Editar</a>
+    {% endif %}
+  </div>
+</div>
+
+<dl class="grid gap-3 rounded-lg bg-white p-4 shadow sm:grid-cols-3">
+  <div><dt class="text-xs uppercase text-slate-500">Instrutor</dt><dd>{{ turma.instrutor.nome }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Período</dt><dd>{{ turma.data_inicio|date:"d/m/Y" }} a {{ turma.data_fim|date:"d/m/Y" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Horário</dt><dd>{{ turma.horario_display }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Sala</dt><dd>{{ turma.sala|default:"—" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Vagas</dt><dd>{{ vagas_ocupadas }} de {{ turma.vagas }} ocupadas · {{ vagas_livres }} livre{{ vagas_livres|pluralize }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Aulas</dt><dd>{{ aulas_realizadas }} de {{ total_aulas }} realizadas</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Valor</dt><dd>{% if turma.curso.gratuito %}Gratuito{% else %}{{ turma.curso.valor|reais }}{% endif %}</dd></div>
+</dl>
+
+<div class="mt-6 mb-2 flex flex-wrap items-center justify-between gap-2">
+  <h2 class="text-lg font-semibold">Alunos</h2>
+  {% if perfil == "administrador" and turma.status == "inscricoes_abertas" %}
+    <a href="{% url 'matriculas:matricula_nova' %}?turma={{ turma.pk }}&voltar={{ request.path|urlencode }}"
+       class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">+ Matricular aluno</a>
+  {% endif %}
+</div>
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for matricula in matriculas %}
+      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          {% if perfil == "administrador" %}
+            <a href="{% url 'alunos:aluno_detalhe' matricula.aluno.pk %}" class="font-medium text-indigo-700 hover:underline">{{ matricula.aluno.nome }}</a>
+          {% else %}
+            <span class="font-medium">{{ matricula.aluno.nome }}</span>
+          {% endif %}
+          <p class="text-xs text-slate-500">{{ matricula.get_status_display }} · matrícula em {{ matricula.data|date:"d/m/Y" }}{% if aulas_realizadas %} · frequência {{ frequencias|valor_de:matricula.pk|percentual }}{% endif %}</p>
+        </div>
+        {% include "matriculas/_acoes.html" %}
+        {% if perfil == "administrador" and matricula.certificado %}
+          <a href="{% url 'certificados:pdf' matricula.certificado.codigo_validacao %}" class="text-sm text-indigo-700 hover:underline">Certificado (PDF)</a>
+        {% endif %}
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhum aluno matriculado ainda.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<h2 class="mt-6 mb-2 text-lg font-semibold">Lista de espera</h2>
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ol class="divide-y divide-slate-100">
+    {% for matricula in fila %}
+      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-3">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800">{{ forloop.counter }}º</span>
+          <div>
+            <span class="font-medium">{{ matricula.aluno.nome }}</span>
+            <p class="text-xs text-slate-500">Na fila desde {{ matricula.data|date:"d/m/Y H:i" }}</p>
+          </div>
+        </div>
+        {% include "matriculas/_acoes.html" %}
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Ninguém na fila.</li>
+    {% endfor %}
+  </ol>
+</div>
+{% endblock %}

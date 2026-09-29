@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Validar certificado · Cursos Livres{% endblock %}
+{% block content %}
+<div class="mx-auto max-w-lg">
+  <h1 class="mb-1 text-2xl font-semibold">Validação de certificado</h1>
+  <p class="mb-4 text-slate-600">Digite o código impresso no certificado ou leia o QR Code.</p>
+
+  <form method="get" action="{% url 'certificados:validar_busca' %}" class="mb-6 flex flex-col gap-2 sm:flex-row">
+    <input name="codigo" value="{{ codigo|default:'' }}" placeholder="Código de validação" required
+           class="flex-1 rounded border border-slate-300 px-3 py-2 font-mono text-sm" aria-label="Código de validação">
+    <button class="rounded bg-indigo-700 px-4 py-2 font-medium text-white hover:bg-indigo-800">Validar</button>
+  </form>
+
+  {% if consultado %}
+    {% if valido %}
+      <div class="rounded-lg border border-green-200 bg-white p-5 shadow">
+        <p class="mb-4 flex items-center gap-2 text-lg font-semibold text-green-800">
+          <span class="flex h-7 w-7 items-center justify-center rounded-full bg-green-100">✓</span> Certificado válido
+        </p>
+        <dl class="grid gap-3 sm:grid-cols-2">
+          <div><dt class="text-xs uppercase text-slate-500">Aluno</dt><dd class="font-medium">{{ dados.nome }}</dd></div>
+          <div><dt class="text-xs uppercase text-slate-500">CPF</dt><dd>{{ dados.cpf_mascarado }}</dd></div>
+          <div><dt class="text-xs uppercase text-slate-500">Curso</dt><dd>{{ dados.curso }}</dd></div>
+          <div><dt class="text-xs uppercase text-slate-500">Carga horária</dt><dd>{{ dados.carga_horaria }} h</dd></div>
+          <div><dt class="text-xs uppercase text-slate-500">Período</dt><dd>{{ dados.data_inicio|date:"d/m/Y" }} a {{ dados.data_fim|date:"d/m/Y" }}</dd></div>
+          <div><dt class="text-xs uppercase text-slate-500">Emitido em</dt><dd>{{ dados.emitido_em|date:"d/m/Y" }}</dd></div>
+        </dl>
+      </div>
+    {% else %}
+      <div class="rounded-lg border border-red-200 bg-red-50 p-5 text-red-800">
+        <p class="font-semibold">Certificado não encontrado</p>
+        <p class="mt-1 text-sm">Nenhum certificado corresponde a este código. Confira se foi digitado corretamente.</p>
+      </div>
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

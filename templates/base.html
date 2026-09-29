@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Cursos Livres{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-800" hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+  {% if user.is_authenticated %}
+  <header class="bg-indigo-700 text-white">
+    <nav class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-4 py-3">
+      <a href="{% url 'contas:painel' %}" class="text-lg font-semibold">Cursos Livres</a>
+      <details class="relative lg:hidden">
+        <summary class="cursor-pointer list-none rounded px-3 py-1 ring-1 ring-white/40">Menu</summary>
+        <div class="absolute right-0 z-10 mt-2 w-48 rounded bg-white py-2 text-slate-800 shadow">
+          {% include "partials/menu.html" with classe="block px-4 py-2 hover:bg-slate-100" %}
+        </div>
+      </details>
+      <div class="hidden items-center gap-4 lg:flex">
+        {% include "partials/menu.html" with classe="hover:underline" %}
+      </div>
+    </nav>
+  </header>
+  {% endif %}
+
+  <main class="mx-auto max-w-6xl px-4 py-6">
+    {% if messages %}
+      <div class="mb-4 space-y-2">
+        {% for message in messages %}
+          <div class="rounded border px-4 py-2
+            {% if message.tags == 'success' %}border-green-200 bg-green-50 text-green-900
+            {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-900
+            {% elif message.tags == 'error' %}border-red-200 bg-red-50 text-red-800
+            {% else %}border-indigo-200 bg-indigo-50 text-indigo-900{% endif %}">{{ message }}</div>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

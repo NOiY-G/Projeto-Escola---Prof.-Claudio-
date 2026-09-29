@@ -54,15 +54,28 @@ jobs:
         run: pyinstaller --noconfirm --log-level WARN apresentacao/cursos_livres.spec
 
       # Roda o próprio executável: sobe o sistema, abre as telas e gera um certificado.
+      # Falha também se aparecer erro de fontes (a mensagem apareceria na apresentação).
       - name: Testar o executável
-        shell: pwsh
+        shell: cmd
         env:
           PYTHONIOENCODING: utf-8
         run: |
-          & "dist/CursosLivres-Apresentacao/Iniciar apresentacao.exe" --teste --porta 8123
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-          # Os dados do teste não vão no pacote.
-          Remove-Item -Recurse -Force "dist/CursosLivres-Apresentacao/dados-da-apresentacao"
+          "dist\CursosLivres-Apresentacao\Iniciar apresentacao.exe" --teste --porta 8123 > teste.txt 2>&1
+          set CODIGO=%ERRORLEVEL%
+          type teste.txt
+          if not "%CODIGO%"=="0" exit /b %CODIGO%
+          findstr /C:"Fontconfig error" teste.txt && (echo ERRO: as fontes do PDF nao foram configuradas & exit /b 1)
+          exit /b 0
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: certificado-gerado-no-teste
+          path: dist/CursosLivres-Apresentacao/dados-da-apresentacao/certificado-teste.pdf
+          retention-days: 7
+
+      - name: Tirar os dados do teste do pacote
+        shell: pwsh
+        run: Remove-Item -Recurse -Force "dist/CursosLivres-Apresentacao/dados-da-apresentacao"
 
       - name: Incluir as instruções
         shell: pwsh

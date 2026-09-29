@@ -12,6 +12,7 @@ import argparse
 import io
 import os
 import socket
+import subprocess
 import sys
 import threading
 import time
@@ -50,6 +51,29 @@ def porta_livre(preferida=8000):
     raise SystemExit("Nenhuma porta livre entre 8000 e 8099.")
 
 
+def reiniciar_com_ambiente_do_pdf():
+    """No Windows empacotado, reinicia o programa com as variáveis das bibliotecas de PDF.
+
+    As bibliotecas em C (fontconfig) leem o ambiente só quando o processo começa, então
+    definir as variáveis depois, pelo Python, não adianta. Sem isso a janela mostraria
+    "Fontconfig error" e o PDF usaria a configuração reserva (mais lenta).
+    """
+    gtk = PASTA_PROGRAMA / "gtk"
+    if not (CONGELADO and gtk.is_dir()) or os.environ.get("CURSOS_LIVRES_REINICIADO"):
+        return
+    fontes = gtk / "etc" / "fonts"
+    ambiente = dict(
+        os.environ,
+        CURSOS_LIVRES_REINICIADO="1",
+        FONTCONFIG_PATH=str(fontes),
+        FONTCONFIG_FILE=str(fontes / "fonts.conf"),
+    )
+    try:
+        sys.exit(subprocess.call([sys.executable, *sys.argv[1:]], env=ambiente))
+    except KeyboardInterrupt:
+        sys.exit(0)
+
+
 def configurar_ambiente(ip, teste):
     PASTA_DADOS.mkdir(parents=True, exist_ok=True)
     sys.path.insert(0, str(PASTA_PROGRAMA))
@@ -68,8 +92,6 @@ def configurar_ambiente(ip, teste):
     if gtk.is_dir():
         # Bibliotecas do WeasyPrint (PDF) empacotadas junto no Windows.
         os.environ["WEASYPRINT_DLL_DIRECTORIES"] = str(gtk / "bin")
-        os.environ.setdefault("FONTCONFIG_PATH", str(gtk / "etc" / "fonts"))
-        os.environ.setdefault("FONTCONFIG_FILE", "fonts.conf")
     import django
 
     django.setup()
@@ -170,6 +192,7 @@ def main():
     parser.add_argument("--porta", type=int, default=8000)
     args = parser.parse_args()
 
+    reiniciar_com_ambiente_do_pdf()
     ip = ip_na_rede()
     configurar_ambiente(ip, args.teste)
     preparar_dados(args.manter_dados)

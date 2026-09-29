@@ -1,0 +1,9 @@
+<a class="{{ classe }}" href="{% url 'contas:painel' %}">Painel</a>
+{% if perfil == "administrador" %}
+  <a class="{{ classe }}" href="{% url 'admin:index' %}">Administração</a>
+{% endif %}
+<span class="{{ classe }} opacity-80">{{ user.get_full_name|default:user.username }}</span>
+<form method="post" action="{% url 'contas:logout' %}" class="inline">
+  {% csrf_token %}
+  <button type="submit" class="{{ classe }} w-full text-left">Sair</button>
+</form>

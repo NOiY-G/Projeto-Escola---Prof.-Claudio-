@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}Painel · Cursos Livres{% endblock %}
+{% block content %}
+<h1 class="text-2xl font-semibold">Olá, {{ user.first_name|default:user.username }}!</h1>
+<p class="mt-1 text-slate-600">
+  {% if perfil %}Perfil: {{ perfil|capfirst }}{% else %}Seu usuário ainda não tem perfil atribuído. Procure a administração.{% endif %}
+</p>
+{% endblock %}

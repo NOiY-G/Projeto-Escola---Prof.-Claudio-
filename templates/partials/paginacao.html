@@ -1,0 +1,11 @@
+{% if page_obj.has_other_pages %}
+<nav class="mt-4 flex items-center justify-between text-sm">
+  {% if page_obj.has_previous %}
+    <a class="rounded px-3 py-1 ring-1 ring-slate-300 hover:bg-white" href="{% querystring page=page_obj.previous_page_number %}">← Anterior</a>
+  {% else %}<span></span>{% endif %}
+  <span class="text-slate-600">Página {{ page_obj.number }} de {{ page_obj.paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+    <a class="rounded px-3 py-1 ring-1 ring-slate-300 hover:bg-white" href="{% querystring page=page_obj.next_page_number %}">Próxima →</a>
+  {% else %}<span></span>{% endif %}
+</nav>
+{% endif %}

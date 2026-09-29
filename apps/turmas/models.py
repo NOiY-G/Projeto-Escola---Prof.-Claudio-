@@ -93,6 +93,16 @@ class Turma(models.Model):
     def dias_semana_lista(self):
         return [d.strip() for d in self.dias_semana.split(",") if d.strip()]
 
+    @property
+    def dias_semana_display(self):
+        """Ex.: "Seg/Qua" """
+        return "/".join(d.capitalize() for d in self.dias_semana_lista)
+
+    @property
+    def horario_display(self):
+        """Ex.: "Seg/Qua, 08:00–10:00" """
+        return f"{self.dias_semana_display}, {self.hora_inicio:%H:%M}–{self.hora_fim:%H:%M}"
+
 
 class Aula(models.Model):
     turma = models.ForeignKey(

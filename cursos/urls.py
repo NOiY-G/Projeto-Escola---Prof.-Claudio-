@@ -8,4 +8,7 @@ admin.site.index_title = "Administração"
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("", include("apps.contas.urls")),
+    path("catalogo/", include("apps.catalogo.urls")),
+    path("turmas/", include("apps.turmas.urls")),
+    path("alunos/", include("apps.alunos.urls")),
 ]

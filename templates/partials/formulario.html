@@ -1,0 +1,27 @@
+{% comment %}Renderiza os campos de um formulário com estilo padrão.{% endcomment %}
+{% if form.non_field_errors %}
+  <div class="mb-4 rounded bg-red-50 px-3 py-2 text-sm text-red-700">
+    {% for erro in form.non_field_errors %}<p>{{ erro }}</p>{% endfor %}
+  </div>
+{% endif %}
+{% for campo in form.hidden_fields %}{{ campo }}{% endfor %}
+<div class="grid gap-4 sm:grid-cols-2">
+  {% for campo in form.visible_fields %}
+    <div class="{% if campo.field.widget.input_type == 'checkbox' and not campo.field.choices %}flex items-center gap-2{% endif %}{% if campo.field.widget.attrs.rows %} sm:col-span-2{% endif %}">
+      {% if campo.field.widget.input_type == "checkbox" and not campo.field.choices %}
+        {{ campo }}<label for="{{ campo.id_for_label }}" class="text-sm">{{ campo.label }}</label>
+      {% else %}
+        <label for="{{ campo.id_for_label }}" class="text-sm font-medium">{{ campo.label }}{% if campo.field.required %} *{% endif %}</label>
+        {% if campo.field.choices and campo.field.widget.allow_multiple_selected %}
+          <div class="mt-2 flex flex-wrap gap-3">
+            {% for opcao in campo %}<label class="flex items-center gap-1 text-sm">{{ opcao.tag }} {{ opcao.choice_label }}</label>{% endfor %}
+          </div>
+        {% else %}
+          {{ campo }}
+        {% endif %}
+      {% endif %}
+      {% if campo.help_text %}<p class="mt-1 text-xs text-slate-500">{{ campo.help_text }}</p>{% endif %}
+      {% for erro in campo.errors %}<p class="mt-1 text-sm text-red-700">{{ erro }}</p>{% endfor %}
+    </div>
+  {% endfor %}
+</div>

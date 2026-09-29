@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% load formatos %}
+{% block title %}{{ turma.codigo }} · Cursos Livres{% endblock %}
+{% block content %}
+<a href="{% url 'turmas:turma_lista' %}" class="text-sm text-indigo-700 hover:underline">← Turmas</a>
+
+<div class="mt-2 mb-4 flex flex-wrap items-start justify-between gap-2">
+  <div>
+    <h1 class="text-2xl font-semibold">{{ turma.codigo }}</h1>
+    <p class="text-slate-600">{{ turma.curso.nome }}</p>
+  </div>
+  <div class="flex items-center gap-3">
+    {% include "turmas/_status.html" %}
+    {% if perfil == "administrador" %}
+      <a href="{% url 'turmas:turma_editar' turma.pk %}" class="rounded px-3 py-1 text-sm ring-1 ring-slate-300 hover:bg-white">Editar</a>
+    {% endif %}
+  </div>
+</div>
+
+<dl class="grid gap-3 rounded-lg bg-white p-4 shadow sm:grid-cols-3">
+  <div><dt class="text-xs uppercase text-slate-500">Instrutor</dt><dd>{{ turma.instrutor.nome }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Período</dt><dd>{{ turma.data_inicio|date:"d/m/Y" }} a {{ turma.data_fim|date:"d/m/Y" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Horário</dt><dd>{{ turma.horario_display }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Sala</dt><dd>{{ turma.sala|default:"—" }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Vagas</dt><dd>{{ vagas_ocupadas }} de {{ turma.vagas }} ocupadas · {{ vagas_livres }} livre{{ vagas_livres|pluralize }}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Valor</dt><dd>{% if turma.curso.gratuito %}Gratuito{% else %}{{ turma.curso.valor|reais }}{% endif %}</dd></div>
+</dl>
+
+<h2 class="mt-6 mb-2 text-lg font-semibold">Alunos</h2>
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for matricula in matriculas %}
+      <li class="flex items-center justify-between gap-2 p-3">
+        <div>
+          {% if perfil == "administrador" %}
+            <a href="{% url 'alunos:aluno_detalhe' matricula.aluno.pk %}" class="font-medium text-indigo-700 hover:underline">{{ matricula.aluno.nome }}</a>
+          {% else %}
+            <span class="font-medium">{{ matricula.aluno.nome }}</span>
+          {% endif %}
+          <p class="text-xs text-slate-500">Matrícula em {{ matricula.data|date:"d/m/Y" }}</p>
+        </div>
+        <span class="text-sm text-slate-600">{{ matricula.get_status_display }}</span>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhum aluno matriculado ainda.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

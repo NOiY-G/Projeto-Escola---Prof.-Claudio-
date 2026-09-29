@@ -1,0 +1,16 @@
+{% load formatos %}
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for aluno in object_list %}
+      <li>
+        <a href="{% url 'alunos:aluno_detalhe' aluno.pk %}" class="flex flex-col p-4 hover:bg-slate-50 sm:flex-row sm:items-center sm:justify-between">
+          <span class="font-medium">{{ aluno.nome }}</span>
+          <span class="text-sm text-slate-600">{{ aluno.cpf|cpf }}{% if aluno.telefone %} · {{ aluno.telefone }}{% endif %}</span>
+        </a>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhum aluno encontrado.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% include "partials/paginacao.html" %}

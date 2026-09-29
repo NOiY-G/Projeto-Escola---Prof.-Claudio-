@@ -1,6 +1,12 @@
 <a class="{{ classe }}" href="{% url 'contas:painel' %}">Painel</a>
 {% if perfil == "administrador" %}
-  <a class="{{ classe }}" href="{% url 'admin:index' %}">Administração</a>
+  <a class="{{ classe }}" href="{% url 'catalogo:curso_lista' %}">Cursos</a>
+  <a class="{{ classe }}" href="{% url 'catalogo:instrutor_lista' %}">Instrutores</a>
+  <a class="{{ classe }}" href="{% url 'turmas:turma_lista' %}">Turmas</a>
+  <a class="{{ classe }}" href="{% url 'alunos:aluno_lista' %}">Alunos</a>
+  <a class="{{ classe }}" href="{% url 'admin:index' %}">Admin</a>
+{% elif perfil == "instrutor" %}
+  <a class="{{ classe }}" href="{% url 'turmas:turma_lista' %}">Minhas turmas</a>
 {% endif %}
 <span class="{{ classe }} opacity-80">{{ user.get_full_name|default:user.username }}</span>
 <form method="post" action="{% url 'contas:logout' %}" class="inline">

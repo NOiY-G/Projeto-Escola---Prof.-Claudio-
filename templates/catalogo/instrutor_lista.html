@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Instrutores · Cursos Livres{% endblock %}
+{% block content %}
+{% url 'catalogo:instrutor_novo' as novo_url %}
+{% include "partials/cabecalho_lista.html" with titulo="Instrutores" novo_rotulo="Novo instrutor" %}
+
+<form method="get" class="mb-4 flex flex-col gap-2 sm:flex-row">
+  <input type="search" name="q" value="{{ request.GET.q }}" placeholder="Buscar por nome ou especialidade"
+         class="flex-1 rounded border border-slate-300 px-3 py-2">
+  <button class="rounded px-4 py-2 ring-1 ring-slate-300 hover:bg-white">Buscar</button>
+</form>
+
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for instrutor in object_list %}
+      <li class="flex flex-col gap-2 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="font-medium">{{ instrutor.nome }}</p>
+          <p class="text-sm text-slate-600">
+            {{ instrutor.usuario.username }}{% if instrutor.usuario.email %} · {{ instrutor.usuario.email }}{% endif %}{% if instrutor.telefone %} · {{ instrutor.telefone }}{% endif %}
+            · {{ instrutor.total_turmas }} turma{{ instrutor.total_turmas|pluralize }}
+          </p>
+          {% if instrutor.especialidades %}<p class="text-sm text-slate-500">{{ instrutor.especialidades|truncatechars:120 }}</p>{% endif %}
+        </div>
+        <a href="{% url 'catalogo:instrutor_editar' instrutor.pk %}" class="text-sm text-indigo-700 hover:underline">Editar</a>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Nenhum instrutor encontrado.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% include "partials/paginacao.html" %}
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Minhas matrículas · Cursos Livres{% endblock %}
+{% block content %}
+<h1 class="mb-4 text-2xl font-semibold">Minhas matrículas</h1>
+{% if not tem_cadastro %}
+  <p class="rounded-lg bg-white p-4 text-slate-600 shadow">Seu usuário ainda não está ligado a um cadastro de aluno. Procure a secretaria.</p>
+{% else %}
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ul class="divide-y divide-slate-100">
+    {% for matricula in matriculas %}
+      <li class="flex flex-col gap-1 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p class="font-medium">{{ matricula.turma.curso.nome }}</p>
+          <p class="text-sm text-slate-600">Turma {{ matricula.turma.codigo }} · {{ matricula.turma.horario_display }}</p>
+          <p class="text-sm text-slate-600">{{ matricula.turma.data_inicio|date:"d/m/Y" }} a {{ matricula.turma.data_fim|date:"d/m/Y" }}{% if matricula.turma.sala %} · {{ matricula.turma.sala }}{% endif %}</p>
+        </div>
+        <span class="text-sm font-medium {% if matricula.status == 'lista_espera' %}text-amber-700{% else %}text-slate-700{% endif %}">
+          {{ matricula.get_status_display }}{% if matricula.posicao %} ({{ matricula.posicao }}º na fila){% endif %}
+        </span>
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Você ainda não tem matrículas.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

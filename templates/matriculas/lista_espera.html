@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Lista de espera · Cursos Livres{% endblock %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center justify-between gap-2">
+  <h1 class="text-2xl font-semibold">Lista de espera</h1>
+  <a href="{% url 'matriculas:matricula_nova' %}" class="rounded bg-indigo-700 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-800">+ Nova matrícula</a>
+</div>
+
+{% for turma, fila in filas.items %}
+  <section class="mb-6">
+    <h2 class="mb-2 font-semibold">
+      <a href="{% url 'turmas:turma_detalhe' turma.pk %}" class="text-indigo-700 hover:underline">{{ turma.codigo }}</a>
+      <span class="font-normal text-slate-600">· {{ turma.curso.nome }} · {{ fila|length }} na fila</span>
+    </h2>
+    <div class="overflow-hidden rounded-lg bg-white shadow">
+      <ol class="divide-y divide-slate-100">
+        {% for matricula in fila %}
+          <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+            <div class="flex items-center gap-3">
+              <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800">{{ forloop.counter }}º</span>
+              <div>
+                <a href="{% url 'alunos:aluno_detalhe' matricula.aluno.pk %}" class="font-medium hover:underline">{{ matricula.aluno.nome }}</a>
+                <p class="text-xs text-slate-500">Na fila desde {{ matricula.data|date:"d/m/Y H:i" }}</p>
+              </div>
+            </div>
+            {% include "matriculas/_acoes.html" %}
+          </li>
+        {% endfor %}
+      </ol>
+    </div>
+  </section>
+{% empty %}
+  <p class="rounded-lg bg-white p-4 text-slate-600 shadow">Nenhuma turma com lista de espera.</p>
+{% endfor %}
+{% endblock %}

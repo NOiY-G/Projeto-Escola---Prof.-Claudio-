@@ -4,9 +4,12 @@
   <a class="{{ classe }}" href="{% url 'catalogo:instrutor_lista' %}">Instrutores</a>
   <a class="{{ classe }}" href="{% url 'turmas:turma_lista' %}">Turmas</a>
   <a class="{{ classe }}" href="{% url 'alunos:aluno_lista' %}">Alunos</a>
+  <a class="{{ classe }}" href="{% url 'matriculas:lista_espera' %}">Lista de espera</a>
   <a class="{{ classe }}" href="{% url 'admin:index' %}">Admin</a>
 {% elif perfil == "instrutor" %}
   <a class="{{ classe }}" href="{% url 'turmas:turma_lista' %}">Minhas turmas</a>
+{% elif perfil == "aluno" %}
+  <a class="{{ classe }}" href="{% url 'matriculas:minhas_matriculas' %}">Minhas matrículas</a>
 {% endif %}
 <span class="{{ classe }} opacity-80">{{ user.get_full_name|default:user.username }}</span>
 <form method="post" action="{% url 'contas:logout' %}" class="inline">

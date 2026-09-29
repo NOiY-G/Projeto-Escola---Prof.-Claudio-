@@ -29,7 +29,11 @@
     {% if messages %}
       <div class="mb-4 space-y-2">
         {% for message in messages %}
-          <div class="rounded border border-indigo-200 bg-indigo-50 px-4 py-2">{{ message }}</div>
+          <div class="rounded border px-4 py-2
+            {% if message.tags == 'success' %}border-green-200 bg-green-50 text-green-900
+            {% elif message.tags == 'warning' %}border-amber-200 bg-amber-50 text-amber-900
+            {% elif message.tags == 'error' %}border-red-200 bg-red-50 text-red-800
+            {% else %}border-indigo-200 bg-indigo-50 text-indigo-900{% endif %}">{{ message }}</div>
         {% endfor %}
       </div>
     {% endif %}

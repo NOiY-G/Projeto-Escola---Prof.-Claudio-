@@ -7,6 +7,9 @@ from apps.catalogo.views import AdminMixin, FormPaginaMixin
 from apps.contas.decorators import PerfilRequeridoMixin
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_INSTRUTOR
 
+from apps.matriculas import services as matriculas_services
+from apps.matriculas.models import Matricula
+
 from . import services
 from .forms import TurmaForm
 from .models import Turma
@@ -43,7 +46,10 @@ class TurmaDetailView(AdminOuInstrutorMixin, DetailView):
     def get_context_data(self, **kwargs):
         turma = self.object
         return super().get_context_data(
-            matriculas=turma.matriculas.select_related("aluno").order_by("status", "aluno__nome"),
+            matriculas=turma.matriculas.select_related("aluno")
+            .exclude(status=Matricula.Status.LISTA_ESPERA)
+            .order_by("status", "aluno__nome"),
+            fila=matriculas_services.lista_espera(turma),
             vagas_ocupadas=services.vagas_ocupadas(turma),
             vagas_livres=services.vagas_livres(turma),
             **kwargs,
@@ -72,6 +78,16 @@ class TurmaUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
     @property
     def titulo(self):
         return f"Editar turma {self.object.codigo}"
+
+    def form_valid(self, form):
+        resposta = super().form_valid(form)
+        # Mais vagas (ou reabertura da turma) chamam os primeiros da fila.
+        for matricula in matriculas_services.preencher_vagas(self.object):
+            messages.info(
+                self.request,
+                f"{matricula.aluno.nome} saiu da lista de espera e agora está com matrícula ativa.",
+            )
+        return resposta
 
     @property
     def voltar_url(self):

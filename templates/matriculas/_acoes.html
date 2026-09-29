@@ -1,0 +1,17 @@
+{% comment %}Botões de cancelar/desistência de uma matrícula em aberto.{% endcomment %}
+{% if perfil == "administrador" and matricula.status == "ativa" or perfil == "administrador" and matricula.status == "lista_espera" %}
+  <div class="flex gap-2">
+    {% if matricula.status == "ativa" %}
+      <form method="post" action="{% url 'matriculas:matricula_desistencia' matricula.pk %}"
+            onsubmit="return confirm('Registrar a desistência de {{ matricula.aluno.nome|escapejs }}?')">
+        {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="rounded px-2 py-1 text-xs ring-1 ring-slate-300 hover:bg-slate-50">Desistência</button>
+      </form>
+    {% endif %}
+    <form method="post" action="{% url 'matriculas:matricula_cancelar' matricula.pk %}"
+          onsubmit="return confirm('Cancelar a matrícula de {{ matricula.aluno.nome|escapejs }}?')">
+      {% csrf_token %}<input type="hidden" name="next" value="{{ request.get_full_path }}">
+      <button class="rounded px-2 py-1 text-xs text-red-700 ring-1 ring-red-200 hover:bg-red-50">Cancelar</button>
+    </form>
+  </div>
+{% endif %}

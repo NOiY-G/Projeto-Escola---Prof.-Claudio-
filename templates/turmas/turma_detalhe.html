@@ -26,24 +26,50 @@
   <div><dt class="text-xs uppercase text-slate-500">Valor</dt><dd>{% if turma.curso.gratuito %}Gratuito{% else %}{{ turma.curso.valor|reais }}{% endif %}</dd></div>
 </dl>
 
-<h2 class="mt-6 mb-2 text-lg font-semibold">Alunos</h2>
+<div class="mt-6 mb-2 flex flex-wrap items-center justify-between gap-2">
+  <h2 class="text-lg font-semibold">Alunos</h2>
+  {% if perfil == "administrador" and turma.status == "inscricoes_abertas" %}
+    <a href="{% url 'matriculas:matricula_nova' %}?turma={{ turma.pk }}&voltar={{ request.path|urlencode }}"
+       class="rounded bg-indigo-700 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-800">+ Matricular aluno</a>
+  {% endif %}
+</div>
 <div class="overflow-hidden rounded-lg bg-white shadow">
   <ul class="divide-y divide-slate-100">
     {% for matricula in matriculas %}
-      <li class="flex items-center justify-between gap-2 p-3">
+      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           {% if perfil == "administrador" %}
             <a href="{% url 'alunos:aluno_detalhe' matricula.aluno.pk %}" class="font-medium text-indigo-700 hover:underline">{{ matricula.aluno.nome }}</a>
           {% else %}
             <span class="font-medium">{{ matricula.aluno.nome }}</span>
           {% endif %}
-          <p class="text-xs text-slate-500">Matrícula em {{ matricula.data|date:"d/m/Y" }}</p>
+          <p class="text-xs text-slate-500">{{ matricula.get_status_display }} · matrícula em {{ matricula.data|date:"d/m/Y" }}</p>
         </div>
-        <span class="text-sm text-slate-600">{{ matricula.get_status_display }}</span>
+        {% include "matriculas/_acoes.html" %}
       </li>
     {% empty %}
       <li class="p-4 text-slate-600">Nenhum aluno matriculado ainda.</li>
     {% endfor %}
   </ul>
+</div>
+
+<h2 class="mt-6 mb-2 text-lg font-semibold">Lista de espera</h2>
+<div class="overflow-hidden rounded-lg bg-white shadow">
+  <ol class="divide-y divide-slate-100">
+    {% for matricula in fila %}
+      <li class="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="flex items-center gap-3">
+          <span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-amber-100 text-sm font-semibold text-amber-800">{{ forloop.counter }}º</span>
+          <div>
+            <span class="font-medium">{{ matricula.aluno.nome }}</span>
+            <p class="text-xs text-slate-500">Na fila desde {{ matricula.data|date:"d/m/Y H:i" }}</p>
+          </div>
+        </div>
+        {% include "matriculas/_acoes.html" %}
+      </li>
+    {% empty %}
+      <li class="p-4 text-slate-600">Ninguém na fila.</li>
+    {% endfor %}
+  </ol>
 </div>
 {% endblock %}

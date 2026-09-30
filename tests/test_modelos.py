@@ -1,4 +1,5 @@
 import datetime
+from decimal import Decimal
 
 import pytest
 from django.core.exceptions import ValidationError
@@ -25,9 +26,21 @@ def test_curso_nome_unico(curso):
         Curso.objects.create(nome="Informática Básica", carga_horaria=10)
 
 
-def test_curso_carga_horaria_positiva():
+def test_carga_horaria_sempre_calculada():
+    # O valor informado é ignorado: meses × 4 semanas × dias por semana × horas por aula.
+    curso = Curso.objects.create(
+        nome="Excel", carga_horaria=999, duracao_meses=2, dias_por_semana=3, horas_por_aula=Decimal("1.5")
+    )
+    assert curso.carga_horaria == 36
+    curso.dias_por_semana = 2
+    curso.save(update_fields=["dias_por_semana"])
+    curso.refresh_from_db()
+    assert curso.carga_horaria == 24
+
+
+def test_curso_dias_por_semana_de_1_a_6():
     with pytest.raises(IntegrityError):
-        Curso.objects.create(nome="Excel", carga_horaria=0)
+        Curso.objects.bulk_create([Curso(nome="Excel", carga_horaria=10, dias_por_semana=7)])
 
 
 def test_turma_vagas_positivas(turma):

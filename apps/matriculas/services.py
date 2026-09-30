@@ -56,6 +56,12 @@ def conflitos_de_horario(aluno, turma):
 # Fila de espera
 
 
+def pre_requisitos_pendentes(aluno, curso):
+    """Pré-requisitos do curso que o aluno ainda não concluiu nesta escola."""
+    concluidos = Matricula.objects.filter(aluno=aluno, status=Matricula.Status.CONCLUIDA).values("turma__curso")
+    return list(curso.pre_requisitos.exclude(pk__in=concluidos).order_by("nome"))
+
+
 def lista_espera(turma):
     """Fila da turma, na ordem de chegada."""
     return (
@@ -99,9 +105,11 @@ def preencher_vagas(turma):
 
 
 @transaction.atomic
-def matricular(aluno, turma, desconto=Decimal("0")) -> Matricula:
+def matricular(aluno, turma, desconto=Decimal("0"), pre_requisito_outra_escola=False) -> Matricula:
     """Matricula o aluno: `ativa` se houver vaga, senão `lista_espera`.
 
+    Pré-requisitos: o aluno precisa ter concluído os cursos pedidos aqui na escola, ou (se o
+    curso aceitar) a secretaria informa que ele os fez em outra escola.
     As mensalidades do curso são geradas quando a matrícula fica ativa.
     """
     # Trava a turma para que duas matrículas simultâneas não peguem a mesma vaga.
@@ -129,6 +137,20 @@ def matricular(aluno, turma, desconto=Decimal("0")) -> Matricula:
             f"{aluno.nome} já está matriculado(a) em turma com horário conflitante: {codigos}."
         )
 
+    pendentes = pre_requisitos_pendentes(aluno, turma.curso)
+    if pendentes:
+        nomes = ", ".join(c.nome for c in pendentes)
+        if not turma.curso.aceita_outra_escola:
+            raise MatriculaErro(
+                f"{aluno.nome} ainda não concluiu o pré-requisito ({nomes}), e o curso "
+                f"{turma.curso.nome} não aceita pré-requisito feito em outra escola."
+            )
+        if not pre_requisito_outra_escola:
+            raise MatriculaErro(
+                f"{aluno.nome} ainda não concluiu o pré-requisito ({nomes}). Se já fez em outra "
+                "escola, marque essa opção."
+            )
+
     desconto = Decimal(desconto)
     if not Decimal("0") <= desconto <= Decimal("100"):
         raise MatriculaErro("O desconto deve estar entre 0% e 100%.")
@@ -136,6 +158,7 @@ def matricular(aluno, turma, desconto=Decimal("0")) -> Matricula:
     status = Matricula.Status.ATIVA if vagas_livres(turma) > 0 else Matricula.Status.LISTA_ESPERA
     matricula = existente or Matricula(aluno=aluno, turma=turma)
     matricula.desconto = desconto
+    matricula.pre_requisito_outra_escola = bool(pendentes)
     # Uma rematrícula entra no fim da fila, como qualquer pedido novo.
     matricula.data = timezone.now()
     matricula.status = status

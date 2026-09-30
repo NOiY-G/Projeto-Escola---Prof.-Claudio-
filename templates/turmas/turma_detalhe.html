@@ -32,7 +32,9 @@
   <div><dt class="text-xs uppercase text-slate-500">Aulas</dt><dd>{{ aulas_realizadas }} de {{ total_aulas }} realizadas</dd></div>
   <div><dt class="text-xs uppercase text-slate-500">Carga horária</dt>
     <dd>{{ carga.carga_prevista|horas }} previstas de {{ carga.carga_do_curso }} h
-      {% if not carga.suficiente %}<span class="block text-sm text-amber-700">Faltam {{ carga.faltam|horas }}: o curso pede no mínimo {{ carga.dias_minimos }} dia{{ carga.dias_minimos|pluralize }} por semana.</span>{% endif %}
+      {% if not carga.suficiente %}<span class="block text-sm text-amber-700">Faltam {{ carga.faltam|horas }}.</span>{% endif %}
+      {% if carga.poucos_dias %}<span class="block text-sm text-amber-700">O curso pede no mínimo {{ carga.dias_minimos }} dia{{ carga.dias_minimos|pluralize }} por semana.</span>{% endif %}
+      {% if carga.aula_curta %}<span class="block text-sm text-amber-700">O curso pede aulas de no mínimo {{ carga.horas_minimas|horas }}.</span>{% endif %}
     </dd></div>
   <div><dt class="text-xs uppercase text-slate-500">Mensalidade</dt><dd>{% include "catalogo/_preco.html" with curso=turma.curso %}</dd></div>
 </dl>
@@ -54,7 +56,7 @@
           {% else %}
             <span class="font-medium">{{ matricula.aluno.nome }}</span>
           {% endif %}
-          <p class="text-xs text-slate-500">{{ matricula.get_status_display }} · matrícula em {{ matricula.data|date:"d/m/Y" }}{% if aulas_realizadas %} · frequência {{ frequencias|valor_de:matricula.pk|percentual }}{% endif %}</p>
+          <p class="text-xs text-slate-500">{{ matricula.get_status_display }} · matrícula em {{ matricula.data|date:"d/m/Y" }}{% if matricula.pre_requisito_outra_escola %} · pré-requisito em outra escola{% endif %}{% if aulas_realizadas %} · frequência {{ frequencias|valor_de:matricula.pk|percentual }}{% endif %}</p>
           {% if perfil == "administrador" %}{% include "financeiro/_situacao.html" with situacao=situacoes|valor_de:matricula.pk so_alerta=True %}{% endif %}
         </div>
         {% include "matriculas/_acoes.html" %}

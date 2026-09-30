@@ -46,7 +46,8 @@ def usuario_aluno(db):
 
 @pytest.fixture
 def curso(db):
-    return Curso.objects.create(nome="Informática Básica", carga_horaria=40, duracao_meses=2)
+    # 1 mês × 4 semanas × 5 dias × 2 h = 40 h
+    return Curso.objects.create(nome="Informática Básica", duracao_meses=1, dias_por_semana=5)
 
 
 @pytest.fixture

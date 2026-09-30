@@ -7,6 +7,7 @@ from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_POST
 
+from apps.alunos.models import Aluno
 from apps.contas.decorators import perfil_requerido
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO, PERFIL_INSTRUTOR
 from apps.financeiro import services as financeiro
@@ -38,6 +39,7 @@ def matricula_nova(request):
                     form.cleaned_data["aluno"],
                     turma,
                     desconto=form.cleaned_data["desconto"],
+                    pre_requisito_outra_escola=form.cleaned_data["pre_requisito_outra_escola"],
                 )
             except services.MatriculaErro as erro:
                 form.add_error(None, erro.message)
@@ -72,10 +74,13 @@ def matricula_resumo_turma(request):
         if turma_id.isdigit()
         else None
     )
-    contexto = {"turma": turma}
+    aluno_id = request.GET.get("aluno", "")
+    aluno = Aluno.objects.filter(pk=aluno_id).first() if aluno_id.isdigit() else None
+    contexto = {"turma": turma, "aluno": aluno}
     if turma:
         contexto.update(
-            plano=turma.curso.planejamento,
+            pre_requisitos=list(turma.curso.pre_requisitos.order_by("nome")),
+            pendentes=services.pre_requisitos_pendentes(aluno, turma.curso) if aluno else None,
             carga=turmas_services.carga_da_turma(turma),
             vencimentos=financeiro.vencimentos_das_mensalidades(turma),
         )

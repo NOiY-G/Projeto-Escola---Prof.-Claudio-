@@ -29,6 +29,12 @@ class MatriculaForm(EstiloTailwindMixin, forms.Form):
         help_text="Vale para todas as mensalidades. Bolsa: 100 deixa a matrícula isenta.",
     )
 
+    pre_requisito_outra_escola = forms.BooleanField(
+        label="O aluno já fez o pré-requisito em outra escola",
+        required=False,
+        help_text="Só é preciso marcar se o aluno não concluiu o pré-requisito aqui.",
+    )
+
     def clean_desconto(self):
         valor = self.cleaned_data["desconto"]
         return Decimal("0") if valor is None else valor

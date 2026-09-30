@@ -31,6 +31,11 @@ class Matricula(models.Model):
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
         help_text="Vale para todas as mensalidades. 100 = bolsa integral",
     )
+    pre_requisito_outra_escola = models.BooleanField(
+        "pré-requisito feito em outra escola",
+        default=False,
+        help_text="Marcado quando o aluno entrou sem ter concluído o pré-requisito nesta escola.",
+    )
 
     class Meta:
         verbose_name = "matrícula"

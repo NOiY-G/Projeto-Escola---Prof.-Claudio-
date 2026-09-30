@@ -1,0 +1,12 @@
+{% load formatos %}
+{% if not calculo %}
+  <p class="rounded bg-slate-50 p-3 text-sm text-slate-600">Preencha a duração, os dias por semana e as horas por aula para calcular a carga horária.</p>
+{% else %}
+  <div class="rounded bg-indigo-50 p-3 text-sm text-indigo-900">
+    <p class="text-base font-semibold">Carga horária: {{ calculo.carga_horaria }} h</p>
+    <p class="mt-1">{{ calculo.duracao_meses }} {% if calculo.duracao_meses == 1 %}mês{% else %}meses{% endif %} × 4 semanas
+      × {{ calculo.dias_por_semana }} dia{{ calculo.dias_por_semana|pluralize }} × {{ calculo.horas_por_aula|horas }}
+      = {{ calculo.aulas }} aulas de {{ calculo.horas_por_aula|horas }}.</p>
+    <p class="mt-1 text-xs text-indigo-700">Cada mês conta como 4 semanas (sobra folga para feriados); aulas de segunda a sábado.</p>
+  </div>
+{% endif %}

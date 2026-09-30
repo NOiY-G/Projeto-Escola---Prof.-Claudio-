@@ -19,64 +19,68 @@ DIAS_DE_AULA_POR_SEMANA = 6
 
 
 @dataclass(frozen=True)
-class Planejamento:
-    """Quantas aulas por semana o curso precisa para cumprir a carga horária."""
+class Calculo:
+    """Carga horária do curso a partir de meses, dias por semana e horas por aula."""
 
-    carga_horaria: int
     duracao_meses: int
+    dias_por_semana: int
     horas_por_aula: Decimal
     semanas: int
-    aulas_necessarias: int
-    dias_minimos: int  # por semana; pode passar de 6 quando não cabe
-    carga_maxima: Decimal  # aula de segunda a sábado durante todo o curso
-
-    @property
-    def cabe(self):
-        return self.dias_minimos <= DIAS_DE_AULA_POR_SEMANA
-
-    @property
-    def carga_planejada(self):
-        """Horas dadas com o mínimo de dias por semana durante todo o curso."""
-        return self.dias_minimos * self.semanas * self.horas_por_aula
+    aulas: int
+    carga_horaria: int
 
 
-def planejar(carga_horaria, duracao_meses, horas_por_aula) -> Planejamento:
-    """Calcula o mínimo de dias de aula por semana (de segunda a sábado).
-
-    aulas necessárias = carga horária ÷ duração da aula (arredondado para cima)
-    dias por semana   = aulas necessárias ÷ (meses × 4 semanas) (arredondado para cima)
-    """
+def calcular(duracao_meses, dias_por_semana, horas_por_aula) -> Calculo:
+    """carga horária = meses × 4 semanas × dias por semana × horas por aula."""
     horas_por_aula = Decimal(horas_por_aula)
-    if carga_horaria <= 0 or duracao_meses <= 0 or horas_por_aula <= 0:
-        raise ValueError("Carga horária, duração e horas por aula precisam ser maiores que zero.")
+    if duracao_meses <= 0 or horas_por_aula <= 0 or not 1 <= dias_por_semana <= DIAS_DE_AULA_POR_SEMANA:
+        raise ValueError("Meses e horas por aula precisam ser maiores que zero; dias por semana, de 1 a 6.")
     semanas = duracao_meses * SEMANAS_POR_MES
-    aulas = math.ceil(Decimal(carga_horaria) / horas_por_aula)
-    return Planejamento(
-        carga_horaria=carga_horaria,
+    aulas = semanas * dias_por_semana
+    return Calculo(
         duracao_meses=duracao_meses,
+        dias_por_semana=dias_por_semana,
         horas_por_aula=horas_por_aula,
         semanas=semanas,
-        aulas_necessarias=aulas,
-        dias_minimos=max(1, math.ceil(aulas / semanas)),
-        carga_maxima=DIAS_DE_AULA_POR_SEMANA * semanas * horas_por_aula,
+        aulas=aulas,
+        # Com aulas de 15 em 15 minutos a conta é exata; se não for, arredonda para cima.
+        carga_horaria=math.ceil(aulas * horas_por_aula),
     )
 
 
-def planejamento_do_curso(curso: Curso) -> Planejamento:
-    return planejar(curso.carga_horaria, curso.duracao_meses, curso.horas_por_aula)
+def calcular_carga_horaria(duracao_meses, dias_por_semana, horas_por_aula) -> int:
+    return calcular(duracao_meses, dias_por_semana, horas_por_aula).carga_horaria
 
 
-def validar_planejamento(carga_horaria, duracao_meses, horas_por_aula):
-    """Mensagem de erro se nem com aula de segunda a sábado a carga horária cabe; senão None."""
-    plano = planejar(carga_horaria, duracao_meses, horas_por_aula)
-    if plano.cabe:
+def calculo_do_curso(curso: Curso) -> Calculo:
+    return calcular(curso.duracao_meses, curso.dias_por_semana, curso.horas_por_aula)
+
+
+# Pré-requisitos
+
+
+def cursos_que_dependem_de(curso: Curso):
+    """Cursos que pedem `curso` como pré-requisito, direta ou indiretamente."""
+    encontrados, fila = set(), [curso.pk]
+    while fila:
+        ids = set(
+            Curso.pre_requisitos.through.objects.filter(to_curso_id__in=fila).values_list("from_curso_id", flat=True)
+        ) - encontrados
+        encontrados |= ids
+        fila = list(ids)
+    return Curso.objects.filter(pk__in=encontrados)
+
+
+def validar_pre_requisitos(curso: Curso, escolhidos):
+    """Mensagem de erro se a escolha cria um ciclo (A pede B e B pede A); senão None."""
+    if curso.pk is None:
         return None
-    return (
-        f"Não cabe: com aulas de {formatar_horas(plano.horas_por_aula)} de segunda a sábado, "
-        f"{plano.duracao_meses} {'mês' if plano.duracao_meses == 1 else 'meses'} dão no máximo "
-        f"{formatar_horas(plano.carga_maxima)}. Aumente a duração ou o tempo de aula, "
-        "ou diminua a carga horária."
-    )
+    if any(c.pk == curso.pk for c in escolhidos):
+        return "Um curso não pode ser pré-requisito dele mesmo."
+    ciclo = [c.nome for c in escolhidos if c in set(cursos_que_dependem_de(curso))]
+    if ciclo:
+        return f"{', '.join(ciclo)} já depende(m) deste curso; não pode(m) ser pré-requisito dele."
+    return None
 
 
 def formatar_horas(horas):

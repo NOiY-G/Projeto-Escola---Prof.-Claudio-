@@ -1,5 +1,7 @@
+import calendar
 import datetime
 from dataclasses import dataclass, field
+from decimal import Decimal
 
 from django.db import transaction
 
@@ -37,6 +39,84 @@ def vagas_ocupadas(turma):
 
 def vagas_livres(turma):
     return max(turma.vagas - vagas_ocupadas(turma), 0)
+
+
+# Datas e carga horária
+
+
+def somar_meses(data, meses):
+    """Mesmo dia `meses` depois; se o mês não tiver o dia (31, 29/02), usa o último dia."""
+    total = data.month - 1 + meses
+    ano, mes = data.year + total // 12, total % 12 + 1
+    return data.replace(year=ano, month=mes, day=min(data.day, calendar.monthrange(ano, mes)[1]))
+
+
+def data_fim_sugerida(curso, inicio):
+    """Término pela duração do curso: véspera do mesmo dia, `duracao_meses` depois."""
+    return somar_meses(inicio, curso.duracao_meses) - datetime.timedelta(days=1)
+
+
+def horas_por_aula(turma):
+    inicio = turma.hora_inicio.hour * 60 + turma.hora_inicio.minute
+    fim = turma.hora_fim.hour * 60 + turma.hora_fim.minute
+    return Decimal(fim - inicio) / Decimal(60)
+
+
+@dataclass(frozen=True)
+class CargaDaTurma:
+    """Compara o calendário da turma com a carga horária do curso."""
+
+    aulas: int
+    horas_por_aula: Decimal
+    carga_prevista: Decimal
+    carga_do_curso: int
+    dias_por_semana: int
+    dias_minimos: int  # do curso (segunda a sábado)
+
+    @property
+    def suficiente(self):
+        return self.carga_prevista >= self.carga_do_curso
+
+    @property
+    def faltam(self):
+        return max(Decimal(self.carga_do_curso) - self.carga_prevista, Decimal(0))
+
+
+def carga_da_turma(turma, usar_calendario=True):
+    """Horas previstas = aulas no calendário (sem feriados) × duração da aula da turma.
+
+    Com `usar_calendario`, conta as aulas já geradas; sem elas, calcula pelas datas.
+    """
+    from apps.catalogo.services import planejamento_do_curso
+
+    if usar_calendario and turma.pk and turma.aulas.exists():
+        aulas = turma.aulas.count()
+    else:
+        aulas = len(datas_das_aulas(turma))
+    horas = horas_por_aula(turma)
+    return CargaDaTurma(
+        aulas=aulas,
+        horas_por_aula=horas,
+        carga_prevista=aulas * horas,
+        carga_do_curso=turma.curso.carga_horaria,
+        dias_por_semana=len(turma.dias_semana_lista),
+        dias_minimos=planejamento_do_curso(turma.curso).dias_minimos,
+    )
+
+
+def aviso_de_carga(turma):
+    """Texto de aviso quando o calendário da turma não cumpre a carga horária; senão None."""
+    from apps.catalogo.services import formatar_horas
+
+    carga = carga_da_turma(turma)
+    if carga.suficiente:
+        return None
+    return (
+        f"O calendário da turma {turma.codigo} prevê {formatar_horas(carga.carga_prevista)} "
+        f"({carga.aulas} aulas de {formatar_horas(carga.horas_por_aula)}), menos que as "
+        f"{carga.carga_do_curso} h do curso. O curso pede no mínimo {carga.dias_minimos} "
+        f"dia(s) de aula por semana."
+    )
 
 
 # Aulas

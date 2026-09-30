@@ -214,7 +214,7 @@ def main():
     admin   Administrador
     maria   Instrutora
     carlos  Instrutor
-    aluno   Aluno (tem certificado e parcela para pagar com Pix)
+    aluno   Aluno (tem certificado e mensalidade para pagar com Pix)
 
   Para encerrar, feche esta janela.
 ==============================================================

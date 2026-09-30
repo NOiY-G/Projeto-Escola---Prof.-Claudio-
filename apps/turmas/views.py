@@ -59,6 +59,7 @@ class TurmaDetailView(AdminOuInstrutorMixin, DetailView):
             aulas_realizadas=matriculas_services.aulas_realizadas(turma).count(),
             vagas_ocupadas=services.vagas_ocupadas(turma),
             vagas_livres=services.vagas_livres(turma),
+            carga=services.carga_da_turma(turma),
             **kwargs,
         )
 
@@ -78,6 +79,12 @@ def _avisar_geracao(request, resultado):
         )
 
 
+def _avisar_carga(request, turma):
+    aviso = services.aviso_de_carga(turma)
+    if aviso:
+        messages.warning(request, aviso)
+
+
 class TurmaCreateView(AdminMixin, FormPaginaMixin, CreateView):
     model = Turma
     form_class = TurmaForm
@@ -91,6 +98,7 @@ class TurmaCreateView(AdminMixin, FormPaginaMixin, CreateView):
     def form_valid(self, form):
         resposta = super().form_valid(form)
         _avisar_geracao(self.request, services.gerar_aulas(self.object))
+        _avisar_carga(self.request, self.object)
         return resposta
 
     def get_success_url(self):
@@ -110,6 +118,7 @@ class TurmaUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
         resposta = super().form_valid(form)
         if services.calendario_mudou(form.changed_data):
             _avisar_geracao(self.request, services.gerar_aulas(self.object))
+        _avisar_carga(self.request, self.object)
         # Mais vagas (ou reabertura da turma) chamam os primeiros da fila.
         for matricula in matriculas_services.preencher_vagas(self.object):
             messages.info(

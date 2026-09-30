@@ -1,0 +1,24 @@
+{% load formatos %}
+{% if turma %}
+  <div class="rounded bg-indigo-50 p-3 text-sm text-indigo-900">
+    <p class="font-medium">Dias mínimos para cumprir a carga horária: {{ plano.dias_minimos }} dia{{ plano.dias_minimos|pluralize }} por semana</p>
+    <p class="mt-1">{{ turma.curso.nome }}: {{ plano.carga_horaria }} h em {{ plano.duracao_meses }} {% if plano.duracao_meses == 1 %}mês{% else %}meses{% endif %}, aulas de {{ plano.horas_por_aula|horas }} (de segunda a sábado).</p>
+    <p class="mt-1">
+      Turma {{ turma.codigo }}: {{ turma.horario_display }} — {{ carga.dias_por_semana }} dia{{ carga.dias_por_semana|pluralize }} por semana,
+      {{ carga.carga_prevista|horas }} previstas.
+    </p>
+    {% if not carga.suficiente %}
+      <p class="mt-1 font-medium text-amber-800">Atenção: o calendário desta turma não chega às {{ carga.carga_do_curso }} h do curso (faltam {{ carga.faltam|horas }}).</p>
+    {% endif %}
+    <p class="mt-2">
+      {% if turma.curso.gratuito %}
+        Curso gratuito.
+      {% elif vencimentos %}
+        {{ vencimentos|length }} mensalidade{{ vencimentos|length|pluralize }} de {{ turma.curso.valor_mensalidade|reais }} (antes do desconto),
+        a 1ª vencendo em {{ vencimentos.0|date:"d/m/Y" }}{% if vencimentos|length < turma.curso.duracao_meses %} — os meses já encerrados da turma não são cobrados{% endif %}.
+      {% else %}
+        Os meses desta turma já terminaram: nada a cobrar.
+      {% endif %}
+    </p>
+  </div>
+{% endif %}

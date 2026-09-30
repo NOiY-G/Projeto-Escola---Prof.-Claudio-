@@ -1,0 +1,1 @@
+{% load formatos %}{% if curso.gratuito %}Gratuito{% else %}{{ curso.valor_mensalidade|reais }}/mês × {{ curso.duracao_meses }} {% if curso.duracao_meses == 1 %}mês{% else %}meses{% endif %}{% endif %}

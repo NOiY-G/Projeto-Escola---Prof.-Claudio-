@@ -41,8 +41,9 @@ Usar grupos do Django:
 
 **Curso**
 - nome (único), descricao, carga_horaria (horas, inteiro > 0)
-- pre_requisitos (texto, opcional), valor (decimal, 0 = gratuito)
-- frequencia_minima (%, padrão 75), parcelas_max (1 a 12, padrão 1 = só à vista), ativo (bool), criado_em
+- duracao_meses (1 a 36; também é o número de mensalidades), horas_por_aula (decimal, ex.: 2 ou 1,5)
+- pre_requisitos (texto, opcional), valor_mensalidade (decimal, 0 = gratuito)
+- frequencia_minima (%, padrão 75), ativo (bool), criado_em
 
 **Instrutor**
 - usuario (OneToOne User), nome, telefone, especialidades
@@ -65,7 +66,7 @@ Usar grupos do Django:
 
 **Matricula**
 - aluno (FK), turma (FK), data, status: `ativa | lista_espera | concluida | desistente | cancelada`
-- n_parcelas (padrão 1), desconto (%, 0 a 100; 100 = bolsa integral)
+- desconto (%, 0 a 100, vale para todas as mensalidades; 100 = bolsa integral)
 - Único por (aluno, turma).
 
 **Frequencia**
@@ -97,21 +98,23 @@ Usar grupos do Django:
 5. Ao concluir a turma, matrículas ativas com frequência ≥ frequência mínima do curso viram `concluida` e ganham certificado. As demais viram `desistente`.
 6. O certificado em PDF traz nome do aluno, CPF parcialmente mascarado, curso, carga horária, período e um QR Code apontando para `/certificados/validar/<codigo>/`.
 7. A página de validação é pública e mostra apenas se o certificado é válido e seus dados básicos.
-8. As parcelas são geradas quando a matrícula fica ativa (na matrícula ou ao sair da fila): valor do curso − desconto, dividido em `n_parcelas` (até `parcelas_max` do curso; centavos que sobram vão para a última). A 1ª vence no início da turma (ou hoje, se já começou) e as demais a cada 30 dias. Curso gratuito ou bolsa integral não gera parcelas (isento).
+8. O curso é cobrado por mensalidade (não há valor total nem parcelamento). As mensalidades (modelo `Parcela`) são geradas quando a matrícula fica ativa (na matrícula ou ao sair da fila): uma por mês de `duracao_meses`, no valor da mensalidade − desconto. A 1ª vence no início da turma e as demais no mesmo dia dos meses seguintes (dia 31 vira o último dia do mês). Quem entra com a turma em andamento não paga os meses já encerrados; a do mês em curso vence hoje. Curso gratuito ou bolsa integral não gera mensalidades (isento).
 9. Cancelamento ou desistência cancelam as parcelas que ainda não venceram (as que vencem hoje inclusive). As vencidas continuam em aberto.
 10. Situação financeira da matrícula: `isento`, `em dia`, `pendente` (parcela vencida há até `TOLERANCIA_PAGAMENTO_DIAS`, padrão 7) ou `inadimplente` (vencida há mais que isso). Parcela com comprovante em análise não conta como vencida. O sistema só avisa (chamada, painel, ficha do aluno); não bloqueia.
 11. Só Pix e dinheiro. O pagamento quita a parcela inteira; data no futuro é recusada; o mesmo código de transação Pix não quita duas parcelas. Estorno exige motivo e devolve a parcela para `aberta`.
 12. O aluno paga pelo Pix "copia e cola" gerado pelo sistema (chave, valor e identificador da parcela, sem API) e envia o comprovante. A secretaria confere no extrato e aprova (vira pagamento Pix) ou recusa com motivo (o aluno vê o motivo e pode reenviar). Comprovantes só são acessíveis ao próprio aluno e à administração.
 13. O certificado não depende da situação financeira.
+14. Carga horária: no cadastro do curso o administrador informa a carga horária, a duração em meses e a duração da aula. O sistema calcula o mínimo de dias de aula por semana, contando de segunda a sábado e cada mês como 4 semanas: aulas = carga ÷ duração da aula (para cima); dias mínimos = aulas ÷ (meses × 4) (para cima). Se passar de 6 dias, o cadastro é recusado. Na matrícula o sistema informa os dias mínimos do curso e se o calendário da turma (aulas sem feriados × duração da aula da turma) cumpre a carga horária; se não cumprir, avisa (na turma e na matrícula), sem bloquear.
+15. Ao criar a turma, se a data de término ficar em branco ela é calculada pela duração do curso.
 
 ## Telas
 
 - **Login** e recuperação de senha
 - **Painel** com números do dia: turmas em andamento, vagas livres, matrículas recentes
-- **Cursos:** listar, criar, editar, ativar/desativar
+- **Cursos:** listar, criar, editar (com prévia dos dias mínimos por semana), ativar/desativar
 - **Turmas:** listar com filtro por status e curso, criar, editar, ver alunos
 - **Alunos:** listar com busca por nome ou CPF, criar, editar, histórico de cursos
-- **Matrículas:** matricular aluno em turma, ver lista de espera
+- **Matrículas:** matricular aluno em turma (mostrando os dias mínimos por semana, a carga prevista da turma e as mensalidades), ver lista de espera
 - **Chamada:** instrutor escolhe a aula e marca presença de todos em uma tela só (HTMX)
 - **Certificados:** emitir, baixar PDF, validar
 - **Feriados:** cadastrar, remover e cadastrar os feriados nacionais do ano

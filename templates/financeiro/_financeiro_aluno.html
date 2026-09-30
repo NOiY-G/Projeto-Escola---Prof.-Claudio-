@@ -6,8 +6,8 @@
       <div>
         <p class="font-medium">{{ item.matricula.turma.curso.nome }} <span class="text-sm font-normal text-slate-500">({{ item.matricula.turma.codigo }})</span></p>
         <p class="text-xs text-slate-500">
-          {{ item.matricula.turma.curso.valor|reais }}{% if item.matricula.desconto %} com {{ item.matricula.desconto|floatformat:"-2" }}% de desconto{% endif %}
-          em {{ item.parcelas|length }} parcela(s)
+          Mensalidade de {{ item.matricula.turma.curso.valor_mensalidade|reais }}{% if item.matricula.desconto %} com {{ item.matricula.desconto|floatformat:"-2" }}% de desconto{% endif %}
+          · {{ item.parcelas|length }} mensalidade{{ item.parcelas|length|pluralize }}
           {% if item.situacao.em_aberto %} · <span class="text-red-700">{{ item.situacao.em_aberto|reais }} vencido</span>{% endif %}
         </p>
       </div>

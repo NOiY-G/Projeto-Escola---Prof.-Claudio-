@@ -18,7 +18,7 @@ from apps.matriculas import services as matriculas
 from apps.matriculas.models import Matricula
 from apps.relatorios import services as relatorios
 from apps.turmas.models import Turma
-from apps.turmas.services import gerar_aulas
+from apps.turmas.services import gerar_aulas, somar_meses
 
 pytestmark = pytest.mark.django_db
 
@@ -33,7 +33,7 @@ def dias(n):
 
 @pytest.fixture
 def excel(db):
-    return Curso.objects.create(nome="Excel", carga_horaria=30, valor=D("150.00"), parcelas_max=3)
+    return Curso.objects.create(nome="Excel", carga_horaria=30, duracao_meses=1, valor_mensalidade=D("150.00"))
 
 
 def _turma(curso, instrutor, codigo="EXC-01", inicio=None, **extra):
@@ -70,7 +70,13 @@ def aluno_logado(alunos):
     return usuario
 
 
-def _matricula(turma, aluno, **kwargs):
+def _matricula(turma, aluno, meses=1, **kwargs):
+    """Matricula com o curso durando `meses`; as mensalidades somam sempre R$ 150,00."""
+    curso = turma.curso
+    if not curso.gratuito:
+        curso.duracao_meses = meses
+        curso.valor_mensalidade = D("150.00") / meses
+        curso.save()
     return matriculas.matricular(aluno, turma, **kwargs)
 
 
@@ -89,17 +95,37 @@ def _png():
 # Geração das parcelas
 
 
-def test_dividir_centavos_vao_para_a_ultima():
-    assert services.dividir(D("100.00"), 3) == [D("33.33"), D("33.33"), D("33.34")]
-    assert sum(services.dividir(D("80.00"), 2)) == D("80.00")
+@pytest.mark.parametrize(
+    "data,meses,esperado",
+    [
+        (datetime.date(2026, 1, 15), 1, datetime.date(2026, 2, 15)),
+        (datetime.date(2026, 1, 31), 1, datetime.date(2026, 2, 28)),  # fevereiro não tem 31
+        (datetime.date(2028, 1, 31), 1, datetime.date(2028, 2, 29)),  # ano bissexto
+        (datetime.date(2026, 11, 10), 3, datetime.date(2027, 2, 10)),  # vira o ano
+        (datetime.date(2026, 3, 10), -3, datetime.date(2025, 12, 10)),
+    ],
+)
+def test_somar_meses(data, meses, esperado):
+    assert somar_meses(data, meses) == esperado
 
 
-def test_matricula_ativa_gera_parcelas(turma_paga, alunos):
-    matricula = _matricula(turma_paga, alunos[0], n_parcelas=3)
+def test_matricula_ativa_gera_uma_mensalidade_por_mes(turma_paga, alunos):
+    matricula = _matricula(turma_paga, alunos[0], meses=3)
     parcelas = list(matricula.parcelas.order_by("numero"))
     assert [p.valor for p in parcelas] == [D("50.00")] * 3
-    assert [p.vencimento for p in parcelas] == [dias(10), dias(40), dias(70)]
+    # Vencem no mesmo dia do início da turma, nos meses seguintes.
+    assert [p.vencimento for p in parcelas] == [dias(10), somar_meses(dias(10), 1), somar_meses(dias(10), 2)]
     assert all(p.status == Parcela.Status.ABERTA for p in parcelas)
+
+
+def test_quem_entra_no_meio_do_curso_paga_so_os_meses_que_faltam(excel, instrutor, alunos):
+    inicio = somar_meses(HOJE, -1) - datetime.timedelta(days=5)  # o 1º mês já acabou
+    turma = _turma(excel, instrutor, inicio=inicio)
+    matricula = _matricula(turma, alunos[0], meses=3)
+    vencimentos = list(matricula.parcelas.order_by("numero").values_list("vencimento", flat=True))
+    # 2º mês em curso: vence hoje; 3º no dia de sempre.
+    assert vencimentos == [HOJE, somar_meses(inicio, 2)]
+    assert services.vencimentos_das_mensalidades(turma) == vencimentos
 
 
 def test_turma_ja_comecada_primeira_parcela_vence_hoje(excel, instrutor, alunos):
@@ -121,8 +147,8 @@ def test_curso_gratuito_nao_gera_parcelas(turma, aluno):
     assert not matricula.parcelas.exists()
 
 
-@pytest.mark.parametrize("kwargs", [{"n_parcelas": 4}, {"n_parcelas": 0}, {"desconto": D("101")}, {"desconto": D("-1")}])
-def test_matricula_valida_parcelas_e_desconto(turma_paga, alunos, kwargs):
+@pytest.mark.parametrize("kwargs", [{"desconto": D("101")}, {"desconto": D("-1")}])
+def test_matricula_valida_desconto(turma_paga, alunos, kwargs):
     with pytest.raises(matriculas.MatriculaErro):
         _matricula(turma_paga, alunos[0], **kwargs)
     assert not Matricula.objects.exists()
@@ -132,14 +158,14 @@ def test_fila_so_gera_parcelas_ao_ser_chamada(turma_paga, alunos):
     turma_paga.vagas = 1
     turma_paga.save()
     primeira = _matricula(turma_paga, alunos[0])
-    na_fila = _matricula(turma_paga, alunos[1], n_parcelas=2)
+    na_fila = _matricula(turma_paga, alunos[1], meses=2)
     assert na_fila.status == Matricula.Status.LISTA_ESPERA and not na_fila.parcelas.exists()
     matriculas.cancelar(primeira)
     assert [p.valor for p in na_fila.parcelas.order_by("numero")] == [D("75.00"), D("75.00")]
 
 
 def test_cancelar_mantem_so_as_vencidas(turma_paga, alunos):
-    matricula = _matricula(turma_paga, alunos[0], n_parcelas=3)
+    matricula = _matricula(turma_paga, alunos[0], meses=3)
     p1, p2, p3 = matricula.parcelas.order_by("numero")
     _vencer(p1, 20)
     p2.vencimento = HOJE  # vence hoje: ainda não venceu
@@ -152,7 +178,7 @@ def test_cancelar_mantem_so_as_vencidas(turma_paga, alunos):
 def test_rematricula_gera_novas_parcelas_sem_colidir_numeros(turma_paga, alunos):
     matricula = _matricula(turma_paga, alunos[0])
     matriculas.cancelar(matricula)
-    _matricula(turma_paga, alunos[0], n_parcelas=2)
+    _matricula(turma_paga, alunos[0], meses=2)
     assert list(matricula.parcelas.order_by("numero").values_list("numero", "status")) == [
         (1, "cancelada"), (2, "aberta"), (3, "aberta"),
     ]
@@ -349,7 +375,7 @@ def test_payload_pix(settings, turma_paga, alunos):
     settings.PIX_CHAVE = "escola@exemplo.com"
     settings.PIX_NOME_RECEBEDOR = "Escola do Prof. Cláudio"
     settings.PIX_CIDADE = "Belém"
-    parcela = _matricula(turma_paga, alunos[0], n_parcelas=3).parcelas.first()
+    parcela = _matricula(turma_paga, alunos[0], meses=3).parcelas.first()
     codigo = services.payload_pix(parcela)
     assert codigo.startswith("000201")
     assert "0014br.gov.bcb.pix0118escola@exemplo.com" in codigo
@@ -374,7 +400,7 @@ def test_pode_ver_matricula(turma_paga, alunos, aluno_logado, usuario_admin, usu
 
 def test_numeros_do_painel(turma_paga, alunos, aluno_logado):
     m1 = _matricula(turma_paga, alunos[0])
-    m2 = _matricula(turma_paga, alunos[1], n_parcelas=3)
+    m2 = _matricula(turma_paga, alunos[1], meses=3)
     _vencer(m1.parcelas.get(), 20)
     _pagar(m2.parcelas.order_by("numero").first())
     services.enviar_comprovante(m2.parcelas.order_by("numero")[1], _png(), aluno_logado)
@@ -386,7 +412,7 @@ def test_numeros_do_painel(turma_paga, alunos, aluno_logado):
 
 
 def test_relatorio_financeiro_por_mes(turma_paga, alunos):
-    m1 = _matricula(turma_paga, alunos[0], n_parcelas=3)
+    m1 = _matricula(turma_paga, alunos[0], meses=3)
     _pagar(m1.parcelas.order_by("numero").first(), forma="pix")
     m2 = _matricula(turma_paga, alunos[1])
     _pagar(m2.parcelas.get(), forma="dinheiro")
@@ -471,7 +497,7 @@ def test_arquivo_do_comprovante_e_protegido(client, turma_paga, alunos, aluno_lo
 
 
 def test_conferir_pela_tela(cliente_admin, turma_paga, alunos, aluno_logado):
-    p1, p2 = _matricula(turma_paga, alunos[0], n_parcelas=2).parcelas.order_by("numero")
+    p1, p2 = _matricula(turma_paga, alunos[0], meses=2).parcelas.order_by("numero")
     c1 = services.enviar_comprovante(p1, _png(), aluno_logado)
     c2 = services.enviar_comprovante(p2, _png(), aluno_logado)
     url = reverse("financeiro:conferir", args=[c1.pk])
@@ -520,22 +546,26 @@ def test_chamada_avisa_sem_mostrar_valores(client, usuario_instrutor, excel, ins
 
 
 def test_ficha_do_aluno_mostra_financeiro(cliente_admin, turma_paga, alunos):
-    matricula = _matricula(turma_paga, alunos[0], n_parcelas=3, desconto=D("10"))
+    matricula = _matricula(turma_paga, alunos[0], meses=3, desconto=D("10"))
     _pagar(matricula.parcelas.order_by("numero").first())
     conteudo = cliente_admin.get(reverse("alunos:aluno_detalhe", args=[alunos[0].pk])).content.decode()
     assert "Financeiro" in conteudo and "com 10% de desconto" in conteudo
     assert "R$ 45,00" in conteudo and "Recibo (PDF)" in conteudo and "Estornar" in conteudo
 
 
-def test_nova_matricula_com_parcelas_pela_tela(cliente_admin, turma_paga, alunos):
+def test_nova_matricula_com_mensalidades_pela_tela(cliente_admin, turma_paga, alunos):
+    turma_paga.curso.duracao_meses = 2
+    turma_paga.curso.valor_mensalidade = D("75.00")
+    turma_paga.curso.save()
     form = cliente_admin.get(reverse("matriculas:matricula_nova")).context["form"]
-    assert "em até 3x" in str(form["turma"])
+    assert "R$ 75,00/mês × 2" in str(form["turma"])
+    assert "n_parcelas" not in form.fields
     cliente_admin.post(
         reverse("matriculas:matricula_nova"),
-        {"aluno": alunos[0].pk, "turma": turma_paga.pk, "n_parcelas": 2, "desconto": "20"},
+        {"aluno": alunos[0].pk, "turma": turma_paga.pk, "desconto": "20"},
     )
     matricula = Matricula.objects.get()
-    assert (matricula.n_parcelas, matricula.desconto) == (2, D("20"))
+    assert matricula.desconto == D("20")
     assert list(matricula.parcelas.values_list("valor", flat=True)) == [D("60.00"), D("60.00")]
 
 
@@ -552,7 +582,7 @@ def test_relatorio_financeiro_na_tela(cliente_admin, turma_paga, alunos):
 
 
 def test_so_destaca_o_pix_vencido_ou_proximo(turma_paga, alunos):
-    matricula = _matricula(turma_paga, alunos[0], n_parcelas=3)  # vencem em 10, 40 e 70 dias
+    matricula = _matricula(turma_paga, alunos[0], meses=3)  # vencem em 10 dias, 1 e 2 meses depois
     assert not any(p.destacar for p in services.parcelas_do_aluno(matricula))
     _vencer(matricula.parcelas.order_by("numero")[1], 3)
     destaques = [p.numero for p in services.parcelas_do_aluno(matricula) if p.destacar]

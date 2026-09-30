@@ -23,8 +23,9 @@
         <div>
           <p class="font-medium">{{ curso.nome }}</p>
           <p class="text-sm text-slate-600">
-            {{ curso.carga_horaria }} h ·
-            {% if curso.gratuito %}Gratuito{% else %}{{ curso.valor|reais }}{% endif %} ·
+            {{ curso.carga_horaria }} h em {{ curso.duracao_meses }} {% if curso.duracao_meses == 1 %}mês{% else %}meses{% endif %} ·
+            aulas de {{ curso.horas_por_aula|horas }} · mínimo {{ curso.dias_minimos }} dia{{ curso.dias_minimos|pluralize }} por semana ·
+            {% include "catalogo/_preco.html" %} ·
             frequência mínima {{ curso.frequencia_minima }}% ·
             {{ curso.total_turmas }} turma{{ curso.total_turmas|pluralize }}
           </p>

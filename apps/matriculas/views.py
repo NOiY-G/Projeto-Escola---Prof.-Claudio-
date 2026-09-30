@@ -37,7 +37,6 @@ def matricula_nova(request):
                 matricula = services.matricular(
                     form.cleaned_data["aluno"],
                     turma,
-                    n_parcelas=form.cleaned_data["n_parcelas"],
                     desconto=form.cleaned_data["desconto"],
                 )
             except services.MatriculaErro as erro:
@@ -59,9 +58,28 @@ def matricula_nova(request):
         voltar = reverse("matriculas:lista_espera")
     return render(
         request,
-        "partials/form_pagina.html",
+        "matriculas/matricula_form.html",
         {"form": form, "titulo": "Nova matrícula", "voltar_url": voltar},
     )
+
+
+@perfil_requerido(PERFIL_ADMINISTRADOR)
+def matricula_resumo_turma(request):
+    """Prévia (HTMX): carga horária, mínimo de dias por semana e mensalidades da turma escolhida."""
+    turma_id = request.GET.get("turma", "")
+    turma = (
+        Turma.objects.select_related("curso", "instrutor").filter(pk=turma_id).first()
+        if turma_id.isdigit()
+        else None
+    )
+    contexto = {"turma": turma}
+    if turma:
+        contexto.update(
+            plano=turma.curso.planejamento,
+            carga=turmas_services.carga_da_turma(turma),
+            vencimentos=financeiro.vencimentos_das_mensalidades(turma),
+        )
+    return render(request, "matriculas/_resumo_turma.html", contexto)
 
 
 def _alterar(request, pk, operacao, mensagem):

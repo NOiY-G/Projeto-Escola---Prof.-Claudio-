@@ -1,9 +1,11 @@
-"""Regras do financeiro: parcelas, pagamentos (Pix e dinheiro) e comprovantes.
+"""Regras do financeiro: mensalidades (parcelas), pagamentos (Pix e dinheiro) e comprovantes.
 
 Regras:
-- As parcelas nascem quando a matrícula fica ativa (na matrícula ou ao sair da fila).
-  Valor = valor do curso − desconto; dividido em `n_parcelas` (até o máximo do curso).
-  A 1ª vence no início da turma (ou hoje, se a turma já começou) e as demais a cada 30 dias.
+- As mensalidades nascem quando a matrícula fica ativa (na matrícula ou ao sair da fila):
+  uma por mês de duração do curso, no valor da mensalidade − desconto. A 1ª vence no início
+  da turma e as demais no mesmo dia dos meses seguintes. Quem entra com a turma já em
+  andamento paga a partir do mês em curso (com vencimento hoje); meses já encerrados não
+  são cobrados.
 - Cancelamento/desistência cancelam as parcelas que ainda não venceram.
 - Situação: isento (nada a pagar), em dia, pendente (vencida há até N dias) ou
   inadimplente (vencida há mais de N dias). Parcela com comprovante em análise não conta
@@ -13,7 +15,7 @@ Regras:
 import datetime
 import unicodedata
 from dataclasses import dataclass
-from decimal import ROUND_DOWN, Decimal
+from decimal import Decimal
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -27,11 +29,11 @@ from apps.alunos.validators import mascarar_cpf
 from apps.contas.qr import qr_code_data_uri
 from apps.contas.services import PERFIL_ADMINISTRADOR, PERFIL_ALUNO, perfil_do_usuario
 from apps.matriculas.models import Matricula
+from apps.turmas.services import somar_meses
 
 from .models import Comprovante, Pagamento, Parcela
 
 CENTAVO = Decimal("0.01")
-DIAS_ENTRE_PARCELAS = 30
 
 
 class FinanceiroErro(ValidationError):
@@ -41,44 +43,45 @@ class FinanceiroErro(ValidationError):
 # Parcelas
 
 
-def valor_total(matricula):
-    """Valor do curso com o desconto da matrícula."""
-    bruto = matricula.turma.curso.valor
+def valor_da_mensalidade(matricula):
+    """Mensalidade do curso com o desconto da matrícula."""
+    bruto = matricula.turma.curso.valor_mensalidade
     liquido = bruto * (Decimal("100") - matricula.desconto) / Decimal("100")
     return liquido.quantize(CENTAVO)
-
-
-def dividir(total, n):
-    """Divide em n parcelas; os centavos que sobram vão para a última."""
-    base = (total / n).quantize(CENTAVO, rounding=ROUND_DOWN)
-    return [base] * (n - 1) + [total - base * (n - 1)]
 
 
 def parcelas_validas(matricula):
     return matricula.parcelas.exclude(status=Parcela.Status.CANCELADA)
 
 
+def vencimentos_das_mensalidades(turma, hoje=None):
+    """Vencimentos de quem se matricula hoje: um por mês do curso, a partir do início da turma.
+
+    Meses que já acabaram não são cobrados; o mês em curso vence hoje (se já passou o dia).
+    """
+    hoje = hoje or timezone.localdate()
+    inicio = turma.data_inicio
+    return [
+        max(somar_meses(inicio, mes), hoje)
+        for mes in range(turma.curso.duracao_meses)
+        if somar_meses(inicio, mes + 1) > hoje
+    ]
+
+
 @transaction.atomic
 def gerar_parcelas(matricula, hoje=None):
-    """Cria as parcelas da matrícula ativa. Não faz nada se já existirem ou se for isenta."""
+    """Cria as mensalidades da matrícula ativa. Não faz nada se já existirem ou se for isenta."""
     if parcelas_validas(matricula).exists():
         return []
-    total = valor_total(matricula)
-    if total <= 0:
+    valor = valor_da_mensalidade(matricula)
+    if valor <= 0:
         return []
-    hoje = hoje or timezone.localdate()
-    n = max(1, min(matricula.n_parcelas, matricula.turma.curso.parcelas_max))
-    primeira = max(matricula.turma.data_inicio, hoje)
+    vencimentos = vencimentos_das_mensalidades(matricula.turma, hoje)
     # Numeração continua depois de parcelas antigas (rematrícula após cancelar).
     ultimo = matricula.parcelas.order_by("-numero").values_list("numero", flat=True).first() or 0
     return [
-        Parcela.objects.create(
-            matricula=matricula,
-            numero=ultimo + i + 1,
-            valor=valor,
-            vencimento=primeira + datetime.timedelta(days=DIAS_ENTRE_PARCELAS * i),
-        )
-        for i, valor in enumerate(dividir(total, n))
+        Parcela.objects.create(matricula=matricula, numero=ultimo + i + 1, valor=valor, vencimento=vencimento)
+        for i, vencimento in enumerate(vencimentos)
     ]
 
 

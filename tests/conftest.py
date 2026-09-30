@@ -46,7 +46,7 @@ def usuario_aluno(db):
 
 @pytest.fixture
 def curso(db):
-    return Curso.objects.create(nome="Informática Básica", carga_horaria=40, valor=Decimal("0"))
+    return Curso.objects.create(nome="Informática Básica", carga_horaria=40, duracao_meses=2)
 
 
 @pytest.fixture

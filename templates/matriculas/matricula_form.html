@@ -1,0 +1,8 @@
+{% extends "partials/form_pagina.html" %}
+{% block depois_dos_campos %}
+<div id="resumo-turma" class="mt-4"
+     hx-get="{% url 'matriculas:matricula_resumo_turma' %}"
+     hx-trigger="load, change from:#id_turma"
+     hx-include="#id_turma"
+     aria-live="polite"></div>
+{% endblock %}

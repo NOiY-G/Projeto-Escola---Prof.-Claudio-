@@ -34,7 +34,7 @@ comando roda.
 | `admin` | Administrador |
 | `maria` | Instrutora (Informática Básica, Internet Segura) |
 | `carlos` | Instrutor (Excel, Digitação) |
-| `aluno` | Aluno com certificado, matrícula ativa e uma parcela para pagar com Pix |
+| `aluno` | Aluno com certificado, matrícula ativa e uma mensalidade para pagar com Pix |
 
 A senha de todos é `demo1234` (troque com `--senha`). Se o banco já tiver dados, o comando
 para; use `--limpar` para apagar cursos, turmas, alunos, matrículas e certificados e recriar

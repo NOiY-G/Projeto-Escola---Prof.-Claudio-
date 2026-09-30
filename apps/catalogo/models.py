@@ -11,9 +11,23 @@ class Curso(models.Model):
     carga_horaria = models.PositiveIntegerField(
         "carga horária (h)", validators=[MinValueValidator(1)]
     )
+    duracao_meses = models.PositiveSmallIntegerField(
+        "duração (meses)",
+        default=1,
+        validators=[MinValueValidator(1), MaxValueValidator(36)],
+        help_text="Tempo total do curso. Também é o número de mensalidades.",
+    )
+    horas_por_aula = models.DecimalField(
+        "duração da aula (h)",
+        max_digits=4,
+        decimal_places=2,
+        default=Decimal("2"),
+        validators=[MinValueValidator(Decimal("0.5")), MaxValueValidator(Decimal("12"))],
+        help_text="Ex.: 2 ou 1,5",
+    )
     pre_requisitos = models.TextField("pré-requisitos", blank=True)
-    valor = models.DecimalField(
-        "valor (R$)",
+    valor_mensalidade = models.DecimalField(
+        "mensalidade (R$)",
         max_digits=10,
         decimal_places=2,
         default=Decimal("0"),
@@ -24,12 +38,6 @@ class Curso(models.Model):
         "frequência mínima (%)",
         default=75,
         validators=[MinValueValidator(0), MaxValueValidator(100)],
-    )
-    parcelas_max = models.PositiveSmallIntegerField(
-        "máximo de parcelas",
-        default=1,
-        validators=[MinValueValidator(1), MaxValueValidator(12)],
-        help_text="1 = só à vista",
     )
     ativo = models.BooleanField("ativo", default=True)
     criado_em = models.DateTimeField("criado em", auto_now_add=True)
@@ -42,7 +50,11 @@ class Curso(models.Model):
             models.CheckConstraint(
                 condition=models.Q(carga_horaria__gt=0), name="curso_carga_horaria_positiva"
             ),
-            models.CheckConstraint(condition=models.Q(valor__gte=0), name="curso_valor_nao_negativo"),
+            models.CheckConstraint(
+                condition=models.Q(valor_mensalidade__gte=0), name="curso_mensalidade_nao_negativa"
+            ),
+            models.CheckConstraint(condition=models.Q(duracao_meses__gt=0), name="curso_duracao_positiva"),
+            models.CheckConstraint(condition=models.Q(horas_por_aula__gt=0), name="curso_aula_positiva"),
             models.CheckConstraint(
                 condition=models.Q(frequencia_minima__lte=100), name="curso_frequencia_minima_ate_100"
             ),
@@ -53,7 +65,23 @@ class Curso(models.Model):
 
     @property
     def gratuito(self):
-        return self.valor == 0
+        return self.valor_mensalidade == 0
+
+    @property
+    def planejamento(self):
+        from .services import planejamento_do_curso
+
+        return planejamento_do_curso(self)
+
+    @property
+    def dias_minimos(self):
+        """Mínimo de dias de aula por semana para cumprir a carga horária."""
+        return self.planejamento.dias_minimos
+
+    @property
+    def valor_total(self):
+        """Todas as mensalidades, sem desconto."""
+        return self.valor_mensalidade * self.duracao_meses
 
 
 class Instrutor(models.Model):

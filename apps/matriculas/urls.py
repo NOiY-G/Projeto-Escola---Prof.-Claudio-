@@ -6,6 +6,7 @@ app_name = "matriculas"
 
 urlpatterns = [
     path("nova/", views.matricula_nova, name="matricula_nova"),
+    path("nova/turma/", views.matricula_resumo_turma, name="matricula_resumo_turma"),
     path("espera/", views.lista_espera, name="lista_espera"),
     path("minhas/", views.minhas_matriculas, name="minhas_matriculas"),
     path("<int:pk>/cancelar/", views.matricula_cancelar, name="matricula_cancelar"),

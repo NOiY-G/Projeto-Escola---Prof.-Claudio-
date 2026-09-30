@@ -99,10 +99,10 @@ def preencher_vagas(turma):
 
 
 @transaction.atomic
-def matricular(aluno, turma, n_parcelas=1, desconto=Decimal("0")) -> Matricula:
+def matricular(aluno, turma, desconto=Decimal("0")) -> Matricula:
     """Matricula o aluno: `ativa` se houver vaga, senão `lista_espera`.
 
-    As parcelas do curso são geradas quando a matrícula fica ativa.
+    As mensalidades do curso são geradas quando a matrícula fica ativa.
     """
     # Trava a turma para que duas matrículas simultâneas não peguem a mesma vaga.
     turma = Turma.objects.select_for_update().get(pk=turma.pk)
@@ -129,17 +129,12 @@ def matricular(aluno, turma, n_parcelas=1, desconto=Decimal("0")) -> Matricula:
             f"{aluno.nome} já está matriculado(a) em turma com horário conflitante: {codigos}."
         )
 
-    if not 1 <= n_parcelas <= turma.curso.parcelas_max:
-        raise MatriculaErro(
-            f"O curso {turma.curso.nome} pode ser pago em até {turma.curso.parcelas_max} parcela(s)."
-        )
     desconto = Decimal(desconto)
     if not Decimal("0") <= desconto <= Decimal("100"):
         raise MatriculaErro("O desconto deve estar entre 0% e 100%.")
 
     status = Matricula.Status.ATIVA if vagas_livres(turma) > 0 else Matricula.Status.LISTA_ESPERA
     matricula = existente or Matricula(aluno=aluno, turma=turma)
-    matricula.n_parcelas = n_parcelas
     matricula.desconto = desconto
     # Uma rematrícula entra no fim da fila, como qualquer pedido novo.
     matricula.data = timezone.now()

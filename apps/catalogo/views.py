@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib import messages
 from django.db.models import Count, Q
 from django.shortcuts import get_object_or_404, redirect, render
@@ -56,6 +58,7 @@ class CursoListView(AdminMixin, ListView):
 class CursoCreateView(AdminMixin, FormPaginaMixin, CreateView):
     model = Curso
     form_class = CursoForm
+    template_name = "catalogo/curso_form.html"
     titulo = "Novo curso"
     voltar_url = reverse_lazy("catalogo:curso_lista")
     success_url = reverse_lazy("catalogo:curso_lista")
@@ -65,6 +68,7 @@ class CursoCreateView(AdminMixin, FormPaginaMixin, CreateView):
 class CursoUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
     model = Curso
     form_class = CursoForm
+    template_name = "catalogo/curso_form.html"
     voltar_url = reverse_lazy("catalogo:curso_lista")
     success_url = reverse_lazy("catalogo:curso_lista")
     mensagem = "Curso atualizado."
@@ -72,6 +76,26 @@ class CursoUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
     @property
     def titulo(self):
         return f"Editar curso: {self.object.nome}"
+
+
+def _inteiro_ou_decimal(valor, tipo):
+    try:
+        numero = tipo(str(valor).replace(",", "."))
+    except (ArithmeticError, ValueError):
+        return None
+    return numero if numero > 0 else None
+
+
+@perfil_requerido(PERFIL_ADMINISTRADOR)
+def curso_planejamento(request):
+    """Prévia (HTMX) do mínimo de dias por semana enquanto o curso é preenchido."""
+    carga = _inteiro_ou_decimal(request.GET.get("carga_horaria"), int)
+    meses = _inteiro_ou_decimal(request.GET.get("duracao_meses"), int)
+    horas = _inteiro_ou_decimal(request.GET.get("horas_por_aula"), Decimal)
+    plano = None
+    if carga and meses and horas and meses <= 36 and horas <= 12:
+        plano = services.planejar(carga, meses, horas)
+    return render(request, "catalogo/_planejamento.html", {"plano": plano})
 
 
 @require_POST

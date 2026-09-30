@@ -21,6 +21,7 @@ from apps.financeiro import services as financeiro
 from apps.financeiro.models import Comprovante
 from apps.matriculas.models import Frequencia, Matricula
 from apps.turmas.models import Turma
+from apps.turmas.services import aviso_de_carga
 
 pytestmark = pytest.mark.django_db
 S = Matricula.Status
@@ -78,6 +79,8 @@ def test_popular_demo_respeita_as_regras(modo_dev):
     assert not Turma.objects.get(status=Turma.Status.PLANEJADA).matriculas.exists()
     cancelada = Turma.objects.get(status=Turma.Status.CANCELADA)
     assert set(cancelada.matriculas.values_list("status", flat=True)) == {S.CANCELADA}
+    # Todo calendário cumpre a carga horária do curso.
+    assert all(aviso_de_carga(t) is None for t in Turma.objects.all())
     # Todos os CPFs gerados são válidos.
     assert all(cpf_valido(cpf) for cpf in Aluno.objects.values_list("cpf", flat=True))
 

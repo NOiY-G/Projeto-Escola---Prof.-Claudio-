@@ -23,16 +23,13 @@ class Matricula(models.Model):
     status = models.CharField(
         "status", max_length=20, choices=Status.choices, default=Status.ATIVA
     )
-    n_parcelas = models.PositiveSmallIntegerField(
-        "número de parcelas", default=1, validators=[MinValueValidator(1), MaxValueValidator(12)]
-    )
     desconto = models.DecimalField(
         "desconto (%)",
         max_digits=5,
         decimal_places=2,
         default=Decimal("0"),
         validators=[MinValueValidator(Decimal("0")), MaxValueValidator(Decimal("100"))],
-        help_text="100 = bolsa integral",
+        help_text="Vale para todas as mensalidades. 100 = bolsa integral",
     )
 
     class Meta:

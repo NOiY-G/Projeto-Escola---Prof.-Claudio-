@@ -44,3 +44,14 @@ def percentual(valor):
         return "—"
     texto = f"{valor:.1f}".rstrip("0").rstrip(".").replace(".", ",")
     return f"{texto}%"
+
+
+@register.filter
+def horas(valor):
+    """2 -> "2 h", 1.5 -> "1,5 h" """
+    from apps.catalogo.services import formatar_horas
+
+    try:
+        return formatar_horas(valor)
+    except (InvalidOperation, TypeError, ValueError):
+        return valor

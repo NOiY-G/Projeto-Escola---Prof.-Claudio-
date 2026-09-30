@@ -4,6 +4,7 @@ from apps.catalogo.models import Curso
 from apps.contas.forms import DataInput, EstiloTailwindMixin, HoraInput
 
 from .models import DIAS_SEMANA, Feriado, Turma
+from .services import data_fim_sugerida
 
 
 class TurmaForm(EstiloTailwindMixin, forms.ModelForm):
@@ -41,6 +42,16 @@ class TurmaForm(EstiloTailwindMixin, forms.ModelForm):
             cursos = cursos | Curso.objects.filter(pk=self.instance.curso_id)
             self.initial["dias_semana"] = self.instance.dias_semana_lista
         self.fields["curso"].queryset = cursos.distinct()
+        self.fields["data_fim"].required = False
+        self.fields["data_fim"].help_text = "Em branco: calculada pela duração do curso."
+
+    def clean(self):
+        dados = super().clean()
+        if not dados.get("data_fim") and dados.get("curso") and dados.get("data_inicio"):
+            dados["data_fim"] = data_fim_sugerida(dados["curso"], dados["data_inicio"])
+        elif not dados.get("data_fim") and not self.has_error("data_fim"):
+            self.add_error("data_fim", "Informe a data de término.")
+        return dados
 
     def clean_dias_semana(self):
         # Guarda na ordem da semana, ex.: "seg,qua".

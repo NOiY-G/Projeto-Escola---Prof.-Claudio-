@@ -1,0 +1,14 @@
+{% load formatos %}
+{% if not plano %}
+  <p class="rounded bg-slate-50 p-3 text-sm text-slate-600">Preencha carga horária, duração e duração da aula para ver quantos dias de aula por semana o curso precisa.</p>
+{% elif plano.cabe %}
+  <div class="rounded bg-indigo-50 p-3 text-sm text-indigo-900">
+    <p class="font-medium">Mínimo de {{ plano.dias_minimos }} dia{{ plano.dias_minimos|pluralize }} de aula por semana (de segunda a sábado)</p>
+    <p class="mt-1">{{ plano.carga_horaria }} h ÷ aulas de {{ plano.horas_por_aula|horas }} = {{ plano.aulas_necessarias }} aulas
+      em {{ plano.duracao_meses }} {% if plano.duracao_meses == 1 %}mês{% else %}meses{% endif %} ({{ plano.semanas }} semanas).
+      Com {{ plano.dias_minimos }} dia{{ plano.dias_minimos|pluralize }} por semana são {{ plano.carga_planejada|horas }}.</p>
+    <p class="mt-1 text-xs text-indigo-700">Cada mês conta como 4 semanas, deixando folga para feriados.</p>
+  </div>
+{% else %}
+  <p class="rounded bg-red-50 p-3 text-sm text-red-800">Não cabe: mesmo com aula de segunda a sábado, {{ plano.duracao_meses }} {% if plano.duracao_meses == 1 %}mês{% else %}meses{% endif %} com aulas de {{ plano.horas_por_aula|horas }} dão no máximo {{ plano.carga_maxima|horas }}.</p>
+{% endif %}

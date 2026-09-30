@@ -33,7 +33,7 @@ from apps.financeiro.models import Comprovante, Pagamento, Parcela
 from apps.matriculas import services as matriculas
 from apps.matriculas.models import Frequencia, Matricula
 from apps.turmas.models import Aula, Feriado, Turma
-from apps.turmas.services import cadastrar_feriados_nacionais, gerar_aulas
+from apps.turmas.services import cadastrar_feriados_nacionais, data_fim_sugerida, gerar_aulas, somar_meses
 
 SENHA_PADRAO = "demo1234"
 
@@ -41,7 +41,9 @@ CURSOS = [
     {
         "nome": "Informática Básica",
         "carga_horaria": 40,
-        "valor": Decimal("0"),
+        "duracao_meses": 3,
+        "horas_por_aula": Decimal("2"),
+        "valor_mensalidade": Decimal("0"),
         "frequencia_minima": 75,
         "descricao": "Primeiros passos no computador: mouse, teclado, pastas e arquivos, "
         "editor de textos e navegação na internet.",
@@ -50,8 +52,9 @@ CURSOS = [
     {
         "nome": "Excel",
         "carga_horaria": 30,
-        "valor": Decimal("150.00"),
-        "parcelas_max": 3,
+        "duracao_meses": 2,
+        "horas_por_aula": Decimal("2"),
+        "valor_mensalidade": Decimal("75.00"),
         "frequencia_minima": 75,
         "descricao": "Planilhas do básico ao intermediário: fórmulas, funções, gráficos e "
         "tabelas dinâmicas.",
@@ -60,8 +63,9 @@ CURSOS = [
     {
         "nome": "Digitação",
         "carga_horaria": 20,
-        "valor": Decimal("80.00"),
-        "parcelas_max": 2,
+        "duracao_meses": 3,
+        "horas_por_aula": Decimal("2"),
+        "valor_mensalidade": Decimal("40.00"),
         "frequencia_minima": 70,
         "descricao": "Digitação com os dez dedos, postura correta e ganho de velocidade.",
         "pre_requisitos": "",
@@ -69,7 +73,9 @@ CURSOS = [
     {
         "nome": "Internet Segura",
         "carga_horaria": 12,
-        "valor": Decimal("0"),
+        "duracao_meses": 1,
+        "horas_por_aula": Decimal("3"),
+        "valor_mensalidade": Decimal("0"),
         "frequencia_minima": 75,
         "descricao": "Senhas fortes, golpes comuns, compras on-line, privacidade e uso "
         "seguro do celular e das redes sociais.",
@@ -225,16 +231,19 @@ class Command(BaseCommand):
             )
         return alunos
 
-    def _turma(self, codigo, curso, instrutor, inicio, semanas, dias, hora, vagas, sala):
+    def _turma(self, codigo, curso, instrutor, inicio, dias, hora, vagas, sala):
+        """Turma com a duração do curso e aulas do tamanho definido no curso."""
+        curso = self.cursos[curso]
+        comeco = datetime.datetime.combine(inicio, datetime.time(hora))
         turma = Turma.objects.create(
             codigo=codigo,
-            curso=self.cursos[curso],
+            curso=curso,
             instrutor=self.instrutores[instrutor],
             data_inicio=inicio,
-            data_fim=inicio + datetime.timedelta(weeks=semanas, days=-1),
+            data_fim=data_fim_sugerida(curso, inicio),
             dias_semana=dias,
-            hora_inicio=datetime.time(hora),
-            hora_fim=datetime.time(hora + 2),
+            hora_inicio=comeco.time(),
+            hora_fim=(comeco + datetime.timedelta(hours=float(curso.horas_por_aula))).time(),
             vagas=vagas,
             sala=sala,
             status=Turma.Status.INSCRICOES_ABERTAS,
@@ -242,14 +251,14 @@ class Command(BaseCommand):
         gerar_aulas(turma)
         return turma
 
-    def _matricular(self, turma, alunos, dias_antes_do_inicio=20, n_parcelas=1, descontos=None):
+    def _matricular(self, turma, alunos, dias_antes_do_inicio=20, descontos=None):
         """Matricula pelos serviços (vagas, fila, conflito de horário e parcelas valem)."""
         feitas = []
         descontos = descontos or {}
         for i, aluno in enumerate(alunos):
             try:
                 matricula = matriculas.matricular(
-                    aluno, turma, n_parcelas=n_parcelas, desconto=descontos.get(i, Decimal("0"))
+                    aluno, turma, desconto=descontos.get(i, Decimal("0"))
                 )
             except matriculas.MatriculaErro:
                 continue
@@ -289,9 +298,9 @@ class Command(BaseCommand):
         hoje = self.hoje
         segunda = hoje - datetime.timedelta(days=hoje.weekday())
 
-        # 1) Informática Básica concluída há duas semanas, com certificados.
-        inicio = segunda - datetime.timedelta(weeks=12)
-        t1 = self._turma(f"INF-{inicio.year}-01", "Informática Básica", "maria", inicio, 10, "seg,qua", 8, 12, "Laboratório 1")
+        # 1) Informática Básica (3 meses) concluída há umas duas semanas, com certificados.
+        inicio = somar_meses(segunda, -3) - datetime.timedelta(weeks=2)
+        t1 = self._turma(f"INF-{inicio.year}-01", "Informática Básica", "maria", inicio, "seg,qua", 8, 12, "Laboratório 1")
         m1 = self._matricular(t1, a[0:12])
         # Dois alunos com pouca frequência: na conclusão, viram desistentes.
         assiduidade = {m.aluno_id: 0.95 for m in m1}
@@ -308,7 +317,7 @@ class Command(BaseCommand):
 
         # 2) Informática Básica em andamento, lotada e com fila; uma desistência promoveu alguém.
         inicio = segunda - datetime.timedelta(weeks=4)
-        t2 = self._turma(f"INF-{inicio.year}-02", "Informática Básica", "maria", inicio, 8, "ter,qui", 14, 10, "Laboratório 1")
+        t2 = self._turma(f"INF-{inicio.year}-02", "Informática Básica", "maria", inicio, "ter,qui", 14, 10, "Laboratório 1")
         m2 = self._matricular(t2, a[12:25])  # 13 pedidos para 10 vagas: 3 na fila
         matriculas.registrar_desistencia(m2[3])  # abre vaga: o 1º da fila é chamado
         Turma.objects.filter(pk=t2.pk).update(status=Turma.Status.EM_ANDAMENTO)
@@ -321,56 +330,56 @@ class Command(BaseCommand):
 
         # 3) Excel com inscrições abertas (começa em duas semanas), noite.
         inicio = segunda + datetime.timedelta(weeks=2)
-        t3 = self._turma(f"EXC-{inicio.year}-01", "Excel", "carlos", inicio, 8, "seg,qua", 18, 15, "Laboratório 2")
-        # Quem já fez Informática; em 3x, com uma bolsa de 50%.
-        self._matricular(t3, a[0:9], dias_antes_do_inicio=13, n_parcelas=3, descontos={4: Decimal("50")})
+        t3 = self._turma(f"EXC-{inicio.year}-01", "Excel", "carlos", inicio, "seg,qua", 18, 15, "Laboratório 2")
+        # Quem já fez Informática; com uma bolsa de 50%.
+        self._matricular(t3, a[0:9], dias_antes_do_inicio=13, descontos={4: Decimal("50")})
 
         # 4) Digitação com inscrições abertas, turma pequena já cheia e com fila.
         inicio = segunda + datetime.timedelta(weeks=1)
-        t4 = self._turma(f"DIG-{inicio.year}-01", "Digitação", "carlos", inicio, 5, "ter,qui", 9, 6, "Laboratório 2")
-        self._matricular(t4, a[20:30], dias_antes_do_inicio=6, n_parcelas=2)
+        t4 = self._turma(f"DIG-{inicio.year}-01", "Digitação", "carlos", inicio, "ter,qui", 9, 6, "Laboratório 2")
+        self._matricular(t4, a[20:30], dias_antes_do_inicio=6)
 
         # 5) Internet Segura planejada para o mês que vem (sem inscrições ainda).
         inicio = segunda + datetime.timedelta(weeks=5)
-        t5 = self._turma(f"NET-{inicio.year}-01", "Internet Segura", "maria", inicio, 3, "sab", 9, 20, "Auditório")
+        t5 = self._turma(f"NET-{inicio.year}-01", "Internet Segura", "maria", inicio, "qua,sab", 9, 20, "Auditório")
         Turma.objects.filter(pk=t5.pk).update(status=Turma.Status.PLANEJADA)
 
         # 6) Excel cancelada por falta de inscritos.
         inicio = segunda - datetime.timedelta(weeks=6)
-        t6 = self._turma(f"EXC-{inicio.year}-00", "Excel", "carlos", inicio, 8, "sab", 8, 15, "Laboratório 2")
+        t6 = self._turma(f"EXC-{inicio.year}-00", "Excel", "carlos", inicio, "qua,sab", 8, 15, "Laboratório 2")
         for matricula in self._matricular(t6, a[25:28]):
             matriculas.cancelar(matricula)
         Turma.objects.filter(pk=t6.pk).update(status=Turma.Status.CANCELADA)
 
-        # 7) Digitação em andamento (paga, em 2x): um aluno em cada situação de pagamento.
-        inicio = segunda - datetime.timedelta(weeks=5) + datetime.timedelta(days=4)  # sexta
-        t7 = self._turma(f"DIG-{inicio.year}-00", "Digitação", "carlos", inicio, 6, "sex", 18, 8, "Laboratório 2")
+        # 7) Digitação em andamento (paga, 3 mensalidades): um aluno em cada situação de pagamento.
+        # Começou há um mês e poucos dias: a 2ª mensalidade venceu há uns 3 dias.
+        inicio = somar_meses(hoje, -1) - datetime.timedelta(days=3)
+        t7 = self._turma(f"DIG-{inicio.year}-00", "Digitação", "carlos", inicio, "sex", 18, 8, "Laboratório 2")
         self._pagamentos_da_turma_em_andamento(t7, [a[0]] + a[9:16])
         Turma.objects.filter(pk=t7.pk).update(status=Turma.Status.EM_ANDAMENTO)
         t7.refresh_from_db()
         self._fazer_chamadas(t7, {aluno.pk: 0.9 for aluno in a}, ["Postura e teclas guia", "Fileira de cima", "Fileira de baixo", "Números", "Velocidade"])
 
     def _pagamentos_da_turma_em_andamento(self, turma, alunos):
-        """Matrículas feitas antes do início, com parcelas vencendo a partir do 1º dia de aula."""
-        # (número de parcelas, desconto, o que aconteceu com cada parcela)
+        """Matrículas feitas antes do início, com mensalidades vencendo a partir do 1º dia de aula."""
+        # (desconto, o que aconteceu com cada mensalidade; a 3ª ainda vai vencer)
         planos = [
-            (2, 0, ["pix", None]),                  # aluno de login: 2ª vencida há poucos dias (pendente)
-            (2, 0, ["dinheiro", "pix"]),            # em dia
-            (1, 0, ["pix"]),                        # à vista, em dia
-            (2, 0, [None, None]),                   # nada pago: inadimplente
-            (2, 0, ["pix", "comprovante"]),         # 2ª com comprovante esperando conferência
-            (1, 100, []),                           # bolsa integral: isento
-            (1, 50, ["dinheiro"]),                  # meia bolsa, à vista
-            (2, 0, ["pix", "recusado"]),            # comprovante recusado: pendente
+            (0, ["pix", None]),                  # aluno de login: 2ª vencida há poucos dias (pendente)
+            (0, ["dinheiro", "pix"]),            # em dia
+            (0, ["pix", "pix", "pix"]),          # adiantou a última: em dia
+            (0, [None, None]),                   # nada pago: inadimplente
+            (0, ["pix", "comprovante"]),         # 2ª com comprovante esperando conferência
+            (100, []),                           # bolsa integral: isento
+            (50, ["dinheiro", "dinheiro"]),      # meia bolsa, em dia
+            (0, ["pix", "recusado"]),            # comprovante recusado: pendente
         ]
         admin = User.objects.get(username="admin")
-        for i, (aluno, (n, desconto, eventos)) in enumerate(zip(alunos, planos)):
-            matricula = self._matricular(turma, [aluno], n_parcelas=n, descontos={0: Decimal(desconto)})[0]
+        for i, (aluno, (desconto, eventos)) in enumerate(zip(alunos, planos)):
+            matricula = self._matricular(turma, [aluno], descontos={0: Decimal(desconto)})[0]
+            # Como se a matrícula tivesse sido feita antes do início: todas as mensalidades.
+            matricula.parcelas.all().delete()
+            financeiro.gerar_parcelas(matricula, hoje=turma.data_inicio)
             parcelas = list(matricula.parcelas.order_by("numero"))
-            for k, parcela in enumerate(parcelas):
-                # Como se a matrícula tivesse sido feita antes do início da turma.
-                parcela.vencimento = turma.data_inicio + datetime.timedelta(days=financeiro.DIAS_ENTRE_PARCELAS * k)
-                parcela.save(update_fields=["vencimento"])
             for parcela, evento in zip(parcelas, eventos):
                 pago_em = min(parcela.vencimento + datetime.timedelta(days=1), self.hoje)
                 if evento in ("pix", "dinheiro"):
@@ -432,7 +441,7 @@ class Command(BaseCommand):
         for situacao in financeiro.situacoes(Matricula.objects.filter(parcelas__isnull=False).distinct()).values():
             contagem[situacao.rotulo] = contagem.get(situacao.rotulo, 0) + 1
         self.stdout.write(
-            f"  {Parcela.objects.count()} parcelas, {Pagamento.objects.count()} pagamentos, "
+            f"  {Parcela.objects.count()} mensalidades, {Pagamento.objects.count()} pagamentos, "
             f"{Comprovante.objects.filter(status=Comprovante.Status.EM_ANALISE).count()} comprovante(s) para conferir"
         )
         self.stdout.write("  Situação financeira: " + ", ".join(f"{n} {r.lower()}" for r, n in sorted(contagem.items())) + "\n")
@@ -447,5 +456,5 @@ class Command(BaseCommand):
         self.stdout.write("  carlos  – Instrutor (Excel, Digitação)")
         self.stdout.write(
             f"  aluno   – Aluno ({self.alunos[0].nome}: tem certificado, matrícula em Excel e "
-            "uma parcela de Digitação para pagar com Pix)"
+            "uma mensalidade de Digitação para pagar com Pix)"
         )

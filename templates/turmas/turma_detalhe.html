@@ -30,7 +30,11 @@
   <div><dt class="text-xs uppercase text-slate-500">Sala</dt><dd>{{ turma.sala|default:"—" }}</dd></div>
   <div><dt class="text-xs uppercase text-slate-500">Vagas</dt><dd>{{ vagas_ocupadas }} de {{ turma.vagas }} ocupadas · {{ vagas_livres }} livre{{ vagas_livres|pluralize }}</dd></div>
   <div><dt class="text-xs uppercase text-slate-500">Aulas</dt><dd>{{ aulas_realizadas }} de {{ total_aulas }} realizadas</dd></div>
-  <div><dt class="text-xs uppercase text-slate-500">Valor</dt><dd>{% if turma.curso.gratuito %}Gratuito{% else %}{{ turma.curso.valor|reais }}{% endif %}</dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Carga horária</dt>
+    <dd>{{ carga.carga_prevista|horas }} previstas de {{ carga.carga_do_curso }} h
+      {% if not carga.suficiente %}<span class="block text-sm text-amber-700">Faltam {{ carga.faltam|horas }}: o curso pede no mínimo {{ carga.dias_minimos }} dia{{ carga.dias_minimos|pluralize }} por semana.</span>{% endif %}
+    </dd></div>
+  <div><dt class="text-xs uppercase text-slate-500">Mensalidade</dt><dd>{% include "catalogo/_preco.html" with curso=turma.curso %}</dd></div>
 </dl>
 
 <div class="mt-6 mb-2 flex flex-wrap items-center justify-between gap-2">

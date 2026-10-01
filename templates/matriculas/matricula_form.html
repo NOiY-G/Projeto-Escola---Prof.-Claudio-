@@ -2,7 +2,7 @@
 {% block depois_dos_campos %}
 <div id="resumo-turma" class="mt-4"
      hx-get="{% url 'matriculas:matricula_resumo_turma' %}"
-     hx-trigger="load, change from:#id_turma"
-     hx-include="#id_turma"
+     hx-trigger="load, change from:#id_turma, change from:#id_aluno"
+     hx-include="#id_turma, #id_aluno"
      aria-live="polite"></div>
 {% endblock %}

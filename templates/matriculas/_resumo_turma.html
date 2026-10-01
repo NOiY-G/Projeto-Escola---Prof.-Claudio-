@@ -1,14 +1,28 @@
 {% load formatos %}
 {% if turma %}
   <div class="rounded bg-indigo-50 p-3 text-sm text-indigo-900">
-    <p class="font-medium">Dias mínimos para cumprir a carga horária: {{ plano.dias_minimos }} dia{{ plano.dias_minimos|pluralize }} por semana</p>
-    <p class="mt-1">{{ turma.curso.nome }}: {{ plano.carga_horaria }} h em {{ plano.duracao_meses }} {% if plano.duracao_meses == 1 %}mês{% else %}meses{% endif %}, aulas de {{ plano.horas_por_aula|horas }} (de segunda a sábado).</p>
+    <p class="font-medium">{{ turma.curso.nome }}: {{ turma.curso.carga_horaria }} h — mínimo de {{ carga.dias_minimos }} dia{{ carga.dias_minimos|pluralize }} por semana, aulas de no mínimo {{ carga.horas_minimas|horas }}</p>
     <p class="mt-1">
       Turma {{ turma.codigo }}: {{ turma.horario_display }} — {{ carga.dias_por_semana }} dia{{ carga.dias_por_semana|pluralize }} por semana,
       {{ carga.carga_prevista|horas }} previstas.
     </p>
-    {% if not carga.suficiente %}
-      <p class="mt-1 font-medium text-amber-800">Atenção: o calendário desta turma não chega às {{ carga.carga_do_curso }} h do curso (faltam {{ carga.faltam|horas }}).</p>
+    {% if not carga.ok %}
+      <p class="mt-1 font-medium text-amber-800">Atenção: esta turma
+        {% if carga.poucos_dias %}tem menos dias por semana que o mínimo do curso{% if carga.aula_curta or not carga.suficiente %}; {% endif %}{% endif %}
+        {% if carga.aula_curta %}tem aulas mais curtas que o mínimo do curso{% if not carga.suficiente %}; {% endif %}{% endif %}
+        {% if not carga.suficiente %}não chega às {{ carga.carga_do_curso }} h do curso (faltam {{ carga.faltam|horas }}){% endif %}.</p>
+    {% endif %}
+    {% if pre_requisitos %}
+      <p class="mt-2">Pré-requisito: {{ pre_requisitos|join:", " }}.
+        {% if aluno %}
+          {% if pendentes %}
+            <span class="font-medium text-amber-800">{{ aluno.nome }} não concluiu {{ pendentes|join:", " }} aqui.
+              {% if turma.curso.aceita_outra_escola %}Se já fez em outra escola, marque a opção acima.{% else %}Este curso não aceita pré-requisito feito em outra escola.{% endif %}</span>
+          {% else %}
+            <span class="text-green-800">{{ aluno.nome }} já concluiu.</span>
+          {% endif %}
+        {% endif %}
+      </p>
     {% endif %}
     <p class="mt-2">
       {% if turma.curso.gratuito %}

@@ -33,55 +33,53 @@ from apps.financeiro.models import Comprovante, Pagamento, Parcela
 from apps.matriculas import services as matriculas
 from apps.matriculas.models import Frequencia, Matricula
 from apps.turmas.models import Aula, Feriado, Turma
-from apps.turmas.services import cadastrar_feriados_nacionais, data_fim_sugerida, gerar_aulas, somar_meses
+from apps.turmas.services import (
+    cadastrar_feriados_nacionais,
+    carga_da_turma,
+    data_fim_sugerida,
+    gerar_aulas,
+    somar_meses,
+)
 
 SENHA_PADRAO = "demo1234"
 
+# A carga horária sai do cálculo: meses × 4 semanas × dias por semana × horas por aula.
 CURSOS = [
     {
-        "nome": "Informática Básica",
-        "carga_horaria": 40,
+        "nome": "Informática Básica",  # 3 × 4 × 2 × 2 h = 48 h
         "duracao_meses": 3,
+        "dias_por_semana": 2,
         "horas_por_aula": Decimal("2"),
         "valor_mensalidade": Decimal("0"),
         "frequencia_minima": 75,
-        "descricao": "Primeiros passos no computador: mouse, teclado, pastas e arquivos, "
-        "editor de textos e navegação na internet.",
-        "pre_requisitos": "",
     },
     {
-        "nome": "Excel",
-        "carga_horaria": 30,
+        "nome": "Excel",  # 2 × 4 × 2 × 2 h = 32 h
         "duracao_meses": 2,
+        "dias_por_semana": 2,
         "horas_por_aula": Decimal("2"),
         "valor_mensalidade": Decimal("75.00"),
         "frequencia_minima": 75,
-        "descricao": "Planilhas do básico ao intermediário: fórmulas, funções, gráficos e "
-        "tabelas dinâmicas.",
-        "pre_requisitos": "Informática Básica ou conhecimento equivalente.",
     },
     {
-        "nome": "Digitação",
-        "carga_horaria": 20,
+        "nome": "Digitação",  # 3 × 4 × 1 × 2 h = 24 h
         "duracao_meses": 3,
+        "dias_por_semana": 1,
         "horas_por_aula": Decimal("2"),
         "valor_mensalidade": Decimal("40.00"),
         "frequencia_minima": 70,
-        "descricao": "Digitação com os dez dedos, postura correta e ganho de velocidade.",
-        "pre_requisitos": "",
     },
     {
-        "nome": "Internet Segura",
-        "carga_horaria": 12,
+        "nome": "Internet Segura",  # 1 × 4 × 1 × 3 h = 12 h
         "duracao_meses": 1,
+        "dias_por_semana": 1,
         "horas_por_aula": Decimal("3"),
         "valor_mensalidade": Decimal("0"),
         "frequencia_minima": 75,
-        "descricao": "Senhas fortes, golpes comuns, compras on-line, privacidade e uso "
-        "seguro do celular e das redes sociais.",
-        "pre_requisitos": "",
     },
 ]
+# Curso → pré-requisitos.
+PRE_REQUISITOS = {"Excel": ["Informática Básica"]}
 
 INSTRUTORES = [
     {
@@ -193,6 +191,8 @@ class Command(BaseCommand):
         for ano in (self.hoje.year - 1, self.hoje.year, self.hoje.year + 1):
             cadastrar_feriados_nacionais(ano)
         self.cursos = {c["nome"]: Curso.objects.create(**c) for c in CURSOS}
+        for nome, pre in PRE_REQUISITOS.items():
+            self.cursos[nome].pre_requisitos.set([self.cursos[p] for p in pre])
         self.instrutores = {
             i["username"]: criar_instrutor(senha=self.senha, **i) for i in INSTRUTORES
         }
@@ -249,6 +249,11 @@ class Command(BaseCommand):
             status=Turma.Status.INSCRICOES_ABERTAS,
         )
         gerar_aulas(turma)
+        # Feriados no meio: estende a turma por semanas até cumprir a carga horária.
+        while not carga_da_turma(turma).suficiente:
+            turma.data_fim += datetime.timedelta(weeks=1)
+            turma.save(update_fields=["data_fim"])
+            gerar_aulas(turma)
         return turma
 
     def _matricular(self, turma, alunos, dias_antes_do_inicio=20, descontos=None):
@@ -258,7 +263,11 @@ class Command(BaseCommand):
         for i, aluno in enumerate(alunos):
             try:
                 matricula = matriculas.matricular(
-                    aluno, turma, desconto=descontos.get(i, Decimal("0"))
+                    aluno,
+                    turma,
+                    desconto=descontos.get(i, Decimal("0")),
+                    # Quem não concluiu Informática aqui entra como tendo feito em outra escola.
+                    pre_requisito_outra_escola=True,
                 )
             except matriculas.MatriculaErro:
                 continue

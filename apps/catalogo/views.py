@@ -43,7 +43,11 @@ class CursoListView(AdminMixin, ListView):
     paginate_by = 20
 
     def get_queryset(self):
-        qs = Curso.objects.annotate(total_turmas=Count("turmas")).order_by("nome")
+        qs = (
+            Curso.objects.annotate(total_turmas=Count("turmas"))
+            .prefetch_related("pre_requisitos")
+            .order_by("nome")
+        )
         situacao = self.request.GET.get("situacao")
         if situacao == "ativos":
             qs = qs.filter(ativo=True)
@@ -78,7 +82,7 @@ class CursoUpdateView(AdminMixin, FormPaginaMixin, UpdateView):
         return f"Editar curso: {self.object.nome}"
 
 
-def _inteiro_ou_decimal(valor, tipo):
+def _numero(valor, tipo):
     try:
         numero = tipo(str(valor).replace(",", "."))
     except (ArithmeticError, ValueError):
@@ -87,15 +91,15 @@ def _inteiro_ou_decimal(valor, tipo):
 
 
 @perfil_requerido(PERFIL_ADMINISTRADOR)
-def curso_planejamento(request):
-    """Prévia (HTMX) do mínimo de dias por semana enquanto o curso é preenchido."""
-    carga = _inteiro_ou_decimal(request.GET.get("carga_horaria"), int)
-    meses = _inteiro_ou_decimal(request.GET.get("duracao_meses"), int)
-    horas = _inteiro_ou_decimal(request.GET.get("horas_por_aula"), Decimal)
-    plano = None
-    if carga and meses and horas and meses <= 36 and horas <= 12:
-        plano = services.planejar(carga, meses, horas)
-    return render(request, "catalogo/_planejamento.html", {"plano": plano})
+def curso_calculo(request):
+    """Prévia (HTMX) da carga horária enquanto o curso é preenchido."""
+    meses = _numero(request.GET.get("duracao_meses"), int)
+    dias = _numero(request.GET.get("dias_por_semana"), int)
+    horas = _numero(request.GET.get("horas_por_aula"), Decimal)
+    calculo = None
+    if meses and dias and horas and meses <= 36 and dias <= 6 and horas <= 12:
+        calculo = services.calcular(meses, dias, horas)
+    return render(request, "catalogo/_calculo.html", {"calculo": calculo})
 
 
 @require_POST

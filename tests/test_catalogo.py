@@ -68,65 +68,86 @@ def test_catalogo_so_para_administrador(client, usuario_instrutor, usuario_aluno
 
 
 def test_listar_cursos_com_filtro(cliente_admin, curso):
-    Curso.objects.create(
-        nome="Excel Avançado", carga_horaria=20, duracao_meses=2, valor_mensalidade="150.00", ativo=False
+    excel = Curso.objects.create(
+        nome="Excel Avançado", duracao_meses=2, dias_por_semana=2, valor_mensalidade="150.00", ativo=False
     )
+    excel.pre_requisitos.set([curso])
     resposta = cliente_admin.get(reverse("catalogo:curso_lista"))
     conteudo = resposta.content.decode()
     assert "Informática Básica" in conteudo and "Excel Avançado" in conteudo
     assert "R$ 150,00/mês × 2 meses" in conteudo
-    assert "mínimo 2 dias por semana" in conteudo  # Excel Avançado: 10 aulas de 2 h em 8 semanas
+    assert "32 h</strong>" in conteudo and "2 dias por semana, aulas de 2 h" in conteudo
+    assert "Pré-requisito: Informática Básica (ou feito em outra escola)" in conteudo
     assert "Gratuito" in conteudo
 
     resposta = cliente_admin.get(reverse("catalogo:curso_lista"), {"situacao": "inativos"})
     assert list(resposta.context["object_list"]) == [Curso.objects.get(nome="Excel Avançado")]
 
 
-def test_criar_curso(cliente_admin):
+def _dados_curso(**extra):
+    dados = {"nome": "Digitação", "duracao_meses": 2, "dias_por_semana": 3, "horas_por_aula": "1.5",
+             "valor_mensalidade": "0", "frequencia_minima": 75, "aceita_outra_escola": "on", "ativo": "on"}
+    dados.update(extra)
+    return dados
+
+
+def test_criar_curso_calcula_a_carga_horaria(cliente_admin, curso):
     resposta = cliente_admin.post(
-        reverse("catalogo:curso_novo"),
-        {"nome": "Digitação", "carga_horaria": 20, "duracao_meses": 2, "horas_por_aula": "1.5",
-         "valor_mensalidade": "0", "frequencia_minima": 75, "ativo": "on"},
+        reverse("catalogo:curso_novo"), _dados_curso(pre_requisitos=[curso.pk], carga_horaria=999)
     )
     assert resposta.status_code == 302
-    curso = Curso.objects.get(nome="Digitação", ativo=True)
-    assert (curso.duracao_meses, curso.horas_por_aula, curso.gratuito) == (2, Decimal("1.5"), True)
+    novo = Curso.objects.get(nome="Digitação", ativo=True)
+    # 2 meses × 4 semanas × 3 dias × 1,5 h = 36 h (o que vier no formulário é ignorado)
+    assert (novo.duracao_meses, novo.dias_por_semana, novo.horas_por_aula) == (2, 3, Decimal("1.5"))
+    assert novo.carga_horaria == 36 and novo.gratuito and novo.aceita_outra_escola
+    assert list(novo.pre_requisitos.all()) == [curso]
+
+
+def test_formulario_de_curso_sem_descricao_e_com_cursos_de_pre_requisito(cliente_admin, curso):
+    form = cliente_admin.get(reverse("catalogo:curso_novo")).context["form"]
+    assert "descricao" not in form.fields and "carga_horaria" not in form.fields
+    assert list(form.fields["pre_requisitos"].queryset) == [curso]
+    # Na edição, o próprio curso não aparece como opção.
+    form = cliente_admin.get(reverse("catalogo:curso_editar", args=[curso.pk])).context["form"]
+    assert not form.fields["pre_requisitos"].queryset.exists()
+
+
+def test_pre_requisito_nao_pode_fechar_ciclo(cliente_admin, curso):
+    excel = Curso.objects.create(nome="Excel")
+    excel.pre_requisitos.set([curso])  # Excel pede Informática
+    resposta = cliente_admin.post(
+        reverse("catalogo:curso_editar", args=[curso.pk]),
+        _dados_curso(nome="Informática Básica", pre_requisitos=[excel.pk]),
+    )
+    assert "já depende" in resposta.context["form"].errors["pre_requisitos"][0]
+    assert services.validar_pre_requisitos(curso, [curso]) == "Um curso não pode ser pré-requisito dele mesmo."
 
 
 def test_criar_curso_invalido(cliente_admin, curso):
     resposta = cliente_admin.post(
         reverse("catalogo:curso_novo"),
-        {"nome": "Informática Básica", "carga_horaria": 0, "duracao_meses": 0, "horas_por_aula": "0",
+        {"nome": "Informática Básica", "duracao_meses": 0, "dias_por_semana": 7, "horas_por_aula": "1.1",
          "valor_mensalidade": "-1", "frequencia_minima": 120},
     )
     assert resposta.status_code == 200
     erros = resposta.context["form"].errors
-    assert {"nome", "carga_horaria", "duracao_meses", "horas_por_aula", "valor_mensalidade",
+    assert {"nome", "duracao_meses", "dias_por_semana", "horas_por_aula", "valor_mensalidade",
             "frequencia_minima"} <= set(erros)
-
-
-def test_curso_recusa_carga_que_nao_cabe_no_periodo(cliente_admin):
-    # 1 mês = 4 semanas × 6 dias (segunda a sábado) × 2 h = 48 h no máximo.
-    dados = {"nome": "Intensivo", "duracao_meses": 1, "horas_por_aula": "2", "valor_mensalidade": "0",
-             "frequencia_minima": 75}
-    resposta = cliente_admin.post(reverse("catalogo:curso_novo"), {**dados, "carga_horaria": 49})
-    assert "Não cabe" in resposta.context["form"].errors["carga_horaria"][0]
-    resposta = cliente_admin.post(reverse("catalogo:curso_novo"), {**dados, "carga_horaria": 48})
-    assert resposta.status_code == 302
+    assert "15 minutos" in erros["horas_por_aula"][0]
 
 
 def test_editar_curso(cliente_admin, curso):
     resposta = cliente_admin.post(
         reverse("catalogo:curso_editar", args=[curso.pk]),
-        {"nome": "Informática Básica", "carga_horaria": 60, "duracao_meses": 3, "horas_por_aula": "2",
+        {"nome": "Informática Básica", "duracao_meses": 3, "dias_por_semana": 2, "horas_por_aula": "2",
          "valor_mensalidade": "99.90", "frequencia_minima": 80},
     )
     assert resposta.status_code == 302
     curso.refresh_from_db()
     assert (curso.carga_horaria, curso.duracao_meses, str(curso.valor_mensalidade), curso.frequencia_minima) == (
-        60, 3, "99.90", 80,
+        48, 3, "99.90", 80,
     )
-    assert curso.ativo is False  # checkbox desmarcado
+    assert curso.ativo is False and curso.aceita_outra_escola is False  # checkboxes desmarcados
 
 
 def test_alternar_ativo_com_htmx(cliente_admin, curso):
@@ -186,40 +207,36 @@ def test_editar_instrutor(cliente_admin, instrutor):
 
 
 @pytest.mark.parametrize(
-    "carga,meses,horas,aulas,dias_minimos",
+    "meses,dias,horas,aulas,carga",
     [
-        (40, 2, "2", 20, 3),    # 20 aulas em 8 semanas: 2,5 → 3 dias
-        (40, 3, "2", 20, 2),    # 20 aulas em 12 semanas: 1,67 → 2 dias
-        (20, 3, "2", 10, 1),
-        (30, 2, "1.5", 20, 3),  # 30 ÷ 1,5 = 20 aulas
-        (25, 1, "2", 13, 4),    # 12,5 aulas → 13
-        (48, 1, "2", 24, 6),    # segunda a sábado, todas as semanas
-        (49, 1, "2", 25, 7),    # não cabe
+        (3, 2, "2", 24, 48),     # 3 × 4 × 2 × 2 h
+        (2, 3, "1.5", 24, 36),
+        (1, 1, "3", 4, 12),
+        (2, 2, "1.25", 16, 20),
+        (12, 6, "4", 288, 1152),
     ],
 )
-def test_planejar_dias_minimos(carga, meses, horas, aulas, dias_minimos):
-    plano = services.planejar(carga, meses, Decimal(horas))
-    assert (plano.aulas_necessarias, plano.dias_minimos) == (aulas, dias_minimos)
-    assert plano.semanas == meses * 4
-    assert plano.cabe == (dias_minimos <= 6)
-    assert plano.carga_maxima == 6 * meses * 4 * Decimal(horas)
+def test_calcular_carga_horaria(meses, dias, horas, aulas, carga):
+    calculo = services.calcular(meses, dias, Decimal(horas))
+    assert (calculo.semanas, calculo.aulas, calculo.carga_horaria) == (meses * 4, aulas, carga)
 
 
-def test_curso_mostra_dias_minimos(curso):
-    curso.duracao_meses, curso.horas_por_aula = 2, Decimal("2")
-    assert curso.dias_minimos == 3
+@pytest.mark.parametrize("meses,dias,horas", [(0, 2, "2"), (1, 0, "2"), (1, 7, "2"), (1, 2, "0")])
+def test_calcular_recusa_valores_invalidos(meses, dias, horas):
+    with pytest.raises(ValueError):
+        services.calcular(meses, dias, Decimal(horas))
 
 
-def test_previa_do_planejamento_com_htmx(cliente_admin):
-    url = reverse("catalogo:curso_planejamento")
-    conteudo = cliente_admin.get(url, {"carga_horaria": 40, "duracao_meses": 2, "horas_por_aula": "2"}).content.decode()
-    assert "Mínimo de 3 dias de aula por semana" in conteudo and "20 aulas" in conteudo
-    conteudo = cliente_admin.get(url, {"carga_horaria": 100, "duracao_meses": 1, "horas_por_aula": "2"}).content.decode()
-    assert "Não cabe" in conteudo
-    conteudo = cliente_admin.get(url, {"carga_horaria": "", "duracao_meses": "x"}).content.decode()
+def test_previa_do_calculo_com_htmx(cliente_admin):
+    url = reverse("catalogo:curso_calculo")
+    conteudo = cliente_admin.get(url, {"duracao_meses": 3, "dias_por_semana": 2, "horas_por_aula": "2"}).content.decode()
+    assert "Carga horária: 48 h" in conteudo and "24 aulas" in conteudo
+    conteudo = cliente_admin.get(url, {"duracao_meses": 2, "dias_por_semana": 3, "horas_por_aula": "1,5"}).content.decode()
+    assert "Carga horária: 36 h" in conteudo
+    conteudo = cliente_admin.get(url, {"duracao_meses": "", "dias_por_semana": "9"}).content.decode()
     assert "Preencha" in conteudo
 
 
 def test_formulario_de_curso_tem_a_previa(cliente_admin):
     conteudo = cliente_admin.get(reverse("catalogo:curso_novo")).content.decode()
-    assert reverse("catalogo:curso_planejamento") in conteudo
+    assert reverse("catalogo:curso_calculo") in conteudo

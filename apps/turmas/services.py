@@ -64,14 +64,15 @@ def horas_por_aula(turma):
 
 @dataclass(frozen=True)
 class CargaDaTurma:
-    """Compara o calendário da turma com a carga horária do curso."""
+    """Compara o calendário da turma com a carga horária e os mínimos do curso."""
 
     aulas: int
     horas_por_aula: Decimal
     carga_prevista: Decimal
     carga_do_curso: int
     dias_por_semana: int
-    dias_minimos: int  # do curso (segunda a sábado)
+    dias_minimos: int  # do curso
+    horas_minimas: Decimal  # por aula, do curso
 
     @property
     def suficiente(self):
@@ -81,14 +82,24 @@ class CargaDaTurma:
     def faltam(self):
         return max(Decimal(self.carga_do_curso) - self.carga_prevista, Decimal(0))
 
+    @property
+    def poucos_dias(self):
+        return self.dias_por_semana < self.dias_minimos
+
+    @property
+    def aula_curta(self):
+        return self.horas_por_aula < self.horas_minimas
+
+    @property
+    def ok(self):
+        return self.suficiente and not self.poucos_dias and not self.aula_curta
+
 
 def carga_da_turma(turma, usar_calendario=True):
     """Horas previstas = aulas no calendário (sem feriados) × duração da aula da turma.
 
     Com `usar_calendario`, conta as aulas já geradas; sem elas, calcula pelas datas.
     """
-    from apps.catalogo.services import planejamento_do_curso
-
     if usar_calendario and turma.pk and turma.aulas.exists():
         aulas = turma.aulas.count()
     else:
@@ -100,23 +111,34 @@ def carga_da_turma(turma, usar_calendario=True):
         carga_prevista=aulas * horas,
         carga_do_curso=turma.curso.carga_horaria,
         dias_por_semana=len(turma.dias_semana_lista),
-        dias_minimos=planejamento_do_curso(turma.curso).dias_minimos,
+        dias_minimos=turma.curso.dias_por_semana,
+        horas_minimas=turma.curso.horas_por_aula,
     )
 
 
 def aviso_de_carga(turma):
-    """Texto de aviso quando o calendário da turma não cumpre a carga horária; senão None."""
+    """Texto de aviso quando a turma não cumpre os mínimos ou a carga do curso; senão None."""
     from apps.catalogo.services import formatar_horas
 
     carga = carga_da_turma(turma)
-    if carga.suficiente:
+    if carga.ok:
         return None
-    return (
-        f"O calendário da turma {turma.codigo} prevê {formatar_horas(carga.carga_prevista)} "
-        f"({carga.aulas} aulas de {formatar_horas(carga.horas_por_aula)}), menos que as "
-        f"{carga.carga_do_curso} h do curso. O curso pede no mínimo {carga.dias_minimos} "
-        f"dia(s) de aula por semana."
-    )
+    problemas = []
+    if carga.poucos_dias:
+        problemas.append(
+            f"tem {carga.dias_por_semana} dia(s) de aula por semana e o curso pede no mínimo {carga.dias_minimos}"
+        )
+    if carga.aula_curta:
+        problemas.append(
+            f"tem aulas de {formatar_horas(carga.horas_por_aula)} e o curso pede no mínimo "
+            f"{formatar_horas(carga.horas_minimas)}"
+        )
+    if not carga.suficiente:
+        problemas.append(
+            f"prevê {formatar_horas(carga.carga_prevista)} ({carga.aulas} aulas), menos que as "
+            f"{carga.carga_do_curso} h do curso"
+        )
+    return f"A turma {turma.codigo} " + "; ".join(problemas) + "."
 
 
 # Aulas

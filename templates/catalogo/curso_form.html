@@ -1,8 +1,8 @@
 {% extends "partials/form_pagina.html" %}
 {% block depois_dos_campos %}
-<div id="planejamento" class="mt-4"
-     hx-get="{% url 'catalogo:curso_planejamento' %}"
-     hx-trigger="load, input from:#id_carga_horaria delay:400ms, input from:#id_duracao_meses delay:400ms, input from:#id_horas_por_aula delay:400ms"
-     hx-include="#id_carga_horaria, #id_duracao_meses, #id_horas_por_aula"
+<div id="calculo" class="mt-4"
+     hx-get="{% url 'catalogo:curso_calculo' %}"
+     hx-trigger="load, input from:#id_duracao_meses delay:300ms, change from:#id_dias_por_semana, input from:#id_horas_por_aula delay:300ms"
+     hx-include="#id_duracao_meses, #id_dias_por_semana, #id_horas_por_aula"
      aria-live="polite"></div>
 {% endblock %}

@@ -45,14 +45,22 @@ Sem os dados de demonstração, crie um administrador com `python manage.py crea
 ## Executável para apresentação (Windows)
 
 O GitHub monta um executável que não precisa de Python instalado: ele sobe o sistema com os
-dados de demonstração, funciona sem internet e abre o navegador. Para baixar, abra a aba
-**Actions** do repositório → **Executável de apresentação (Windows)** → a execução mais
-recente com ✓ → **Artifacts** → `CursosLivres-Apresentacao-Windows`. As instruções de uso estão
-no `LEIA-ME.txt` dentro do pacote.
+dados de demonstração, funciona sem internet e abre o navegador. Para baixar, abra a página
+**Releases** do repositório (também aparece no app do GitHub) e baixe:
 
-A montagem roda sozinha quando o código muda (e pode ser disparada à mão, em "Run workflow").
-Antes de publicar o pacote, o próprio executável é testado: sobe o sistema, abre as telas de
-cada perfil e gera um certificado em PDF. Sem empacotar, o mesmo lançador roda com
+- `CursosLivres-Apresentacao-Instalador.exe` (recomendado): instala para o usuário, sem pedir
+  administrador, e cria um atalho na Área de Trabalho;
+- `CursosLivres-Apresentacao-Portatil.zip`: extraia e abra `Iniciar apresentacao.exe` na pasta.
+
+Link direto para o instalador mais recente:
+https://github.com/NOiY-G/Projeto-Escola---Prof.-Claudio-/releases/latest/download/CursosLivres-Apresentacao-Instalador.exe
+
+As instruções de uso estão no `LEIA-ME.txt` (instalado junto, e dentro do .zip).
+
+A montagem roda sozinha quando o código muda (e pode ser disparada à mão, em "Run workflow");
+só o que chega na `main` é publicado em Releases (fica só a versão mais recente). Antes de
+publicar, o próprio executável é testado, e de novo depois de instalado pelo instalador: sobe o
+sistema, abre as telas de cada perfil e gera um certificado em PDF. Sem empacotar, o mesmo lançador roda com
 `python apresentacao/iniciar.py` (e `--teste` para só conferir).
 
 ## Testes

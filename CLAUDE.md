@@ -40,9 +40,11 @@ Usar grupos do Django:
 ## Modelo de dados
 
 **Curso**
-- nome (único), descricao, carga_horaria (horas, inteiro > 0)
-- duracao_meses (1 a 36; também é o número de mensalidades), horas_por_aula (decimal, ex.: 2 ou 1,5)
-- pre_requisitos (texto, opcional), valor_mensalidade (decimal, 0 = gratuito)
+- nome (único), duracao_meses (1 a 36; também é o número de mensalidades)
+- dias_por_semana (mínimo de dias de aula por semana, 1 a 6), horas_por_aula (mínimo de horas por aula, decimal de 15 em 15 minutos, ex.: 2 ou 1,5)
+- carga_horaria (horas, calculada, não editável)
+- pre_requisitos (ManyToMany com outros cursos, opcional), aceita_outra_escola (bool, padrão sim)
+- valor_mensalidade (decimal, 0 = gratuito)
 - frequencia_minima (%, padrão 75), ativo (bool), criado_em
 
 **Instrutor**
@@ -67,6 +69,7 @@ Usar grupos do Django:
 **Matricula**
 - aluno (FK), turma (FK), data, status: `ativa | lista_espera | concluida | desistente | cancelada`
 - desconto (%, 0 a 100, vale para todas as mensalidades; 100 = bolsa integral)
+- pre_requisito_outra_escola (bool: entrou com pré-requisito feito em outra escola)
 - Único por (aluno, turma).
 
 **Frequencia**
@@ -104,17 +107,18 @@ Usar grupos do Django:
 11. Só Pix e dinheiro. O pagamento quita a parcela inteira; data no futuro é recusada; o mesmo código de transação Pix não quita duas parcelas. Estorno exige motivo e devolve a parcela para `aberta`.
 12. O aluno paga pelo Pix "copia e cola" gerado pelo sistema (chave, valor e identificador da parcela, sem API) e envia o comprovante. A secretaria confere no extrato e aprova (vira pagamento Pix) ou recusa com motivo (o aluno vê o motivo e pode reenviar). Comprovantes só são acessíveis ao próprio aluno e à administração.
 13. O certificado não depende da situação financeira.
-14. Carga horária: no cadastro do curso o administrador informa a carga horária, a duração em meses e a duração da aula. O sistema calcula o mínimo de dias de aula por semana, contando de segunda a sábado e cada mês como 4 semanas: aulas = carga ÷ duração da aula (para cima); dias mínimos = aulas ÷ (meses × 4) (para cima). Se passar de 6 dias, o cadastro é recusado. Na matrícula o sistema informa os dias mínimos do curso e se o calendário da turma (aulas sem feriados × duração da aula da turma) cumpre a carga horária; se não cumprir, avisa (na turma e na matrícula), sem bloquear.
+14. Carga horária: no cadastro do curso o administrador informa a duração em meses, o mínimo de dias de aula por semana (de segunda a sábado) e o mínimo de horas por aula. O sistema calcula a carga horária = meses × 4 semanas × dias por semana × horas por aula (ex.: 3 × 4 × 2 × 2 h = 48 h) e mostra o cálculo enquanto o formulário é preenchido. Na turma e na matrícula o sistema avisa (sem bloquear) se a turma tem menos dias por semana ou aulas mais curtas que o mínimo do curso, ou se o calendário dela (aulas sem feriados × duração da aula da turma) não chega à carga horária.
 15. Ao criar a turma, se a data de término ficar em branco ela é calculada pela duração do curso.
+16. Pré-requisitos: o curso pode pedir outros cursos já cadastrados. Na matrícula, o aluno precisa ter concluído esses cursos na escola; se não concluiu e o curso aceita, a secretaria marca que ele fez o pré-requisito em outra escola (fica registrado na matrícula). Sem isso, a matrícula é recusada. Um curso não pode ser pré-requisito dele mesmo nem fechar um ciclo.
 
 ## Telas
 
 - **Login** e recuperação de senha
 - **Painel** com números do dia: turmas em andamento, vagas livres, matrículas recentes
-- **Cursos:** listar, criar, editar (com prévia dos dias mínimos por semana), ativar/desativar
+- **Cursos:** listar, criar, editar (com o cálculo da carga horária na hora e os pré-requisitos), ativar/desativar
 - **Turmas:** listar com filtro por status e curso, criar, editar, ver alunos
 - **Alunos:** listar com busca por nome ou CPF, criar, editar, histórico de cursos
-- **Matrículas:** matricular aluno em turma (mostrando os dias mínimos por semana, a carga prevista da turma e as mensalidades), ver lista de espera
+- **Matrículas:** matricular aluno em turma (mostrando os mínimos do curso, a carga prevista da turma, os pré-requisitos do aluno e as mensalidades), ver lista de espera
 - **Chamada:** instrutor escolhe a aula e marca presença de todos em uma tela só (HTMX)
 - **Certificados:** emitir, baixar PDF, validar
 - **Feriados:** cadastrar, remover e cadastrar os feriados nacionais do ano

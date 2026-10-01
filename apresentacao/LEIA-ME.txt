@@ -2,16 +2,23 @@ CURSOS LIVRES - APRESENTAÇÃO
 ============================
 
 COMO ABRIR
+Pelo instalador (CursosLivres-Apresentacao-Instalador.exe):
+1. Abra o instalador e siga os passos (não pede senha de administrador).
+2. Use o atalho "Cursos Livres - Apresentação" na Área de Trabalho ou no
+   menu Iniciar.
+
+Pela versão portátil (CursosLivres-Apresentacao-Portatil.zip):
 1. Extraia o .zip inteiro para uma pasta (por exemplo, na Área de Trabalho).
    Não rode direto de dentro do .zip.
-2. Dê dois cliques em "Iniciar apresentacao.exe".
-3. Na primeira vez, o Windows pode mostrar:
+2. Dê dois cliques em "Iniciar apresentacao.exe", dentro da pasta.
+
+Nos dois casos, na primeira vez o Windows pode mostrar:
    - "O Windows protegeu o computador": clique em "Mais informações" e
      depois em "Executar assim mesmo" (o programa não tem assinatura digital).
    - O Firewall pedindo permissão: marque "Redes privadas" e clique em
      "Permitir acesso". Isso deixa os celulares da sala abrirem o sistema.
-4. O navegador abre sozinho. Se não abrir, use o endereço que aparece
-   na janela preta.
+O navegador abre sozinho. Se não abrir, use o endereço que aparece na
+janela preta.
 
 USUÁRIOS (senha de todos: demo1234)
   admin   Administrador: cadastros, matrículas, pagamentos, relatórios

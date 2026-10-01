@@ -6,10 +6,17 @@ from decimal import Decimal
 import pytest
 from django.urls import reverse
 
+from apps.catalogo.models import Curso
 from apps.turmas import services as turmas
 from apps.turmas.models import Turma
 
 pytestmark = pytest.mark.django_db
+
+
+@pytest.fixture
+def curso(db):
+    # 2 meses × 4 semanas × 3 dias × 2 h = 48 h
+    return Curso.objects.create(nome="Informática Básica", duracao_meses=2, dias_por_semana=3)
 
 
 @pytest.fixture
@@ -43,22 +50,31 @@ def test_carga_da_turma_conta_aulas_sem_feriados(curso, instrutor):
         turmas.cadastrar_feriado(data, "Feriado")
     carga = turmas.carga_da_turma(_turma(curso, instrutor))
     assert (carga.aulas, carga.horas_por_aula, carga.carga_prevista) == (24, Decimal(2), Decimal(48))
-    assert carga.suficiente and carga.dias_minimos == 3  # 40 h, 2 meses, aulas de 2 h
+    assert carga.carga_do_curso == 48 and carga.suficiente and carga.ok
 
 
 def test_aviso_quando_o_calendario_nao_cumpre_a_carga(curso, instrutor):
-    turma = _turma(curso, instrutor, dias="sab")  # 8 sábados × 2 h = 16 h de 40 h
+    turma = _turma(curso, instrutor, dias="sab")  # 8 sábados × 2 h = 16 h de 48 h
     carga = turmas.carga_da_turma(turma)
-    assert not carga.suficiente and carga.faltam == Decimal(24)
+    assert not carga.suficiente and carga.faltam == Decimal(32) and carga.poucos_dias
     aviso = turmas.aviso_de_carga(turma)
-    assert "16 h" in aviso and "no mínimo 3 dia(s)" in aviso
+    assert "tem 1 dia(s) de aula por semana e o curso pede no mínimo 3" in aviso
+    assert "prevê 16 h" in aviso and "menos que as 48 h do curso" in aviso
     assert turmas.aviso_de_carga(_turma(curso, instrutor, codigo="INF-02")) is None
 
 
-def test_aula_mais_longa_compensa_menos_dias(curso, instrutor):
-    # Duas aulas de 3 h por semana: 17 aulas × 3 h = 51 h ≥ 40 h.
+def test_aula_mais_longa_cumpre_a_carga_mas_avisa_dos_dias(curso, instrutor):
+    # Duas aulas de 3 h por semana: 17 aulas × 3 h = 51 h ≥ 48 h, mas o curso pede 3 dias.
     turma = _turma(curso, instrutor, dias="ter,qui", hora_fim=datetime.time(11))
-    assert turmas.carga_da_turma(turma).suficiente
+    carga = turmas.carga_da_turma(turma)
+    assert carga.suficiente and carga.poucos_dias and not carga.ok
+
+
+def test_aula_mais_curta_que_o_minimo_avisa(curso, instrutor):
+    turma = _turma(curso, instrutor, hora_fim=datetime.time(9))  # aulas de 1 h; o curso pede 2 h
+    carga = turmas.carga_da_turma(turma)
+    assert carga.aula_curta and not carga.suficiente
+    assert "tem aulas de 1 h e o curso pede no mínimo 2 h" in turmas.aviso_de_carga(turma)
 
 
 def test_criar_turma_sem_data_fim_usa_duracao_do_curso(client, usuario_admin, curso, instrutor):
@@ -71,7 +87,7 @@ def test_criar_turma_sem_data_fim_usa_duracao_do_curso(client, usuario_admin, cu
     resposta = client.post(reverse("turmas:turma_nova"), dados, follow=True)
     turma = Turma.objects.get(codigo="INF-2026-09")
     assert turma.data_fim == datetime.date(2026, 12, 4)  # curso de 2 meses
-    assert "menos que as" not in resposta.content.decode()
+    assert "A turma INF-2026-09" not in resposta.content.decode()  # nenhum aviso
 
 
 def test_criar_turma_com_poucos_dias_avisa(client, usuario_admin, curso, instrutor):
@@ -83,10 +99,10 @@ def test_criar_turma_com_poucos_dias_avisa(client, usuario_admin, curso, instrut
     }
     conteudo = client.post(reverse("turmas:turma_nova"), dados, follow=True).content.decode()
     assert Turma.objects.filter(codigo="INF-2026-10").exists()  # só avisa, não bloqueia
-    assert "menos que as 40 h do curso" in conteudo
+    assert "menos que as 48 h do curso" in conteudo
     turma = Turma.objects.get(codigo="INF-2026-10")
     detalhe = client.get(reverse("turmas:turma_detalhe", args=[turma.pk])).content.decode()
-    assert "16 h previstas de 40 h" in detalhe and "no mínimo 3 dias por semana" in detalhe
+    assert "16 h previstas de 48 h" in detalhe and "no mínimo 3 dias por semana" in detalhe
 
 
 def test_matricula_informa_dias_minimos_e_mensalidades(cliente_admin, curso, instrutor):
@@ -95,8 +111,8 @@ def test_matricula_informa_dias_minimos_e_mensalidades(cliente_admin, curso, ins
     turma = _turma(curso, instrutor, dias="sab")
     url = reverse("matriculas:matricula_resumo_turma")
     conteudo = cliente_admin.get(url, {"turma": turma.pk}).content.decode()
-    assert "Dias mínimos para cumprir a carga horária: 3 dias por semana" in conteudo
-    assert "1 dia por semana" in conteudo and "não chega às 40 h" in conteudo
+    assert "48 h — mínimo de 3 dias por semana, aulas de no mínimo 2 h" in conteudo
+    assert "1 dia por semana" in conteudo and "não chega às 48 h" in conteudo
     assert "2 mensalidades de R$ 80,00" in conteudo
     assert cliente_admin.get(url, {"turma": "abc"}).content.decode().strip() == ""
     pagina = cliente_admin.get(reverse("matriculas:matricula_nova")).content.decode()

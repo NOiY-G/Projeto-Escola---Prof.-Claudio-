@@ -5,7 +5,7 @@ from django.contrib.auth.password_validation import validate_password
 from apps.contas.forms import EstiloTailwindMixin
 
 from .models import Curso, Instrutor
-from .services import validar_planejamento
+from .services import validar_pre_requisitos
 
 
 class CursoForm(EstiloTailwindMixin, forms.ModelForm):
@@ -13,31 +13,40 @@ class CursoForm(EstiloTailwindMixin, forms.ModelForm):
         model = Curso
         fields = [
             "nome",
-            "descricao",
-            "pre_requisitos",
             "valor_mensalidade",
             "frequencia_minima",
+            "pre_requisitos",
+            "aceita_outra_escola",
             "ativo",
-            # Por último, logo acima da prévia dos dias mínimos por semana.
-            "carga_horaria",
+            # Por último, logo acima do cálculo da carga horária.
             "duracao_meses",
+            "dias_por_semana",
             "horas_por_aula",
         ]
         widgets = {
-            "descricao": forms.Textarea,
-            "pre_requisitos": forms.Textarea,
-            "horas_por_aula": forms.NumberInput(attrs={"step": "0.5"}),
+            "pre_requisitos": forms.CheckboxSelectMultiple,
+            "dias_por_semana": forms.Select(
+                choices=[(n, f"{n} dia{'s' if n > 1 else ''} por semana") for n in range(1, 7)]
+            ),
+            "horas_por_aula": forms.NumberInput(attrs={"step": "0.25"}),
         }
-        help_texts = {"carga_horaria": "Total de horas que o aluno precisa cumprir."}
 
-    def clean(self):
-        dados = super().clean()
-        carga, meses, horas = (dados.get(c) for c in ("carga_horaria", "duracao_meses", "horas_por_aula"))
-        if carga and meses and horas and not self.has_error("carga_horaria"):
-            erro = validar_planejamento(carga, meses, horas)
-            if erro:
-                self.add_error("carga_horaria", erro)
-        return dados
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        cursos = Curso.objects.order_by("nome")
+        if self.instance.pk:
+            cursos = cursos.exclude(pk=self.instance.pk)
+        self.fields["pre_requisitos"].queryset = cursos
+        self.fields["pre_requisitos"].help_text = (
+            "Cursos já cadastrados que o aluno precisa ter concluído. Deixe em branco se não houver."
+        )
+
+    def clean_pre_requisitos(self):
+        escolhidos = self.cleaned_data["pre_requisitos"]
+        erro = validar_pre_requisitos(self.instance, escolhidos)
+        if erro:
+            raise forms.ValidationError(erro)
+        return escolhidos
 
 
 class InstrutorForm(EstiloTailwindMixin, forms.ModelForm):

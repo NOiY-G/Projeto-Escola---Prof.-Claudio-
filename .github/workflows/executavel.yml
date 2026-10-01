@@ -13,6 +13,10 @@ on:
       - "requirements.txt"
       - ".github/workflows/executavel.yml"
 
+# Para publicar o instalador na página de Releases.
+permissions:
+  contents: write
+
 jobs:
   windows:
     runs-on: windows-latest
@@ -81,8 +85,76 @@ jobs:
         shell: pwsh
         run: Copy-Item apresentacao/LEIA-ME.txt dist/CursosLivres-Apresentacao/
 
+      # Instalador .exe (Inno Setup): instala para o usuário, sem pedir administrador.
+      - name: Montar o instalador
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) {
+            choco install innosetup -y --no-progress | Out-Null
+          }
+          $versao = "1.0.${{ github.run_number }}"
+          & $iscc /Q "/DPasta=$PWD\dist\CursosLivres-Apresentacao" "/DVersao=$versao" apresentacao\instalador.iss
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Get-Item dist\CursosLivres-Apresentacao-Instalador.exe | ForEach-Object { "{0}: {1:N0} MB" -f $_.Name, ($_.Length / 1MB) }
+
+      # Instala em silêncio numa pasta temporária e roda o autoteste no programa instalado.
+      - name: Testar o instalador
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+        run: |
+          $destino = Join-Path $env:RUNNER_TEMP "instalado"
+          Start-Process dist\CursosLivres-Apresentacao-Instalador.exe -Wait -ArgumentList @(
+            "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/MERGETASKS=!atalho", "/DIR=$destino"
+          )
+          $exe = Join-Path $destino "Iniciar apresentacao.exe"
+          if (-not (Test-Path $exe)) { throw "O instalador não colocou o executável em $destino" }
+          & $exe --teste --porta 8124 *> instalado.txt
+          $codigo = $LASTEXITCODE
+          Get-Content instalado.txt
+          if ($codigo -ne 0) { exit $codigo }
+          if (Select-String -Path instalado.txt -SimpleMatch "Fontconfig error") { throw "Erro de fontes no programa instalado" }
+
+      - name: Montar o .zip portátil
+        shell: pwsh
+        run: Compress-Archive -Path dist\CursosLivres-Apresentacao -DestinationPath dist\CursosLivres-Apresentacao-Portatil.zip
+
       - uses: actions/upload-artifact@v4
         with:
           name: CursosLivres-Apresentacao-Windows
-          path: dist/CursosLivres-Apresentacao
+          path: |
+            dist/CursosLivres-Apresentacao-Instalador.exe
+            dist/CursosLivres-Apresentacao-Portatil.zip
           retention-days: 30
+
+      # Na main, publica em Releases (aparece no app do GitHub e tem link fixo de download).
+      # Fica só a versão mais recente.
+      - name: Publicar em Releases
+        if: github.ref == 'refs/heads/main'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = "apresentacao-${{ github.run_number }}"
+          $data = (Get-Date).ToUniversalTime().AddHours(-3).ToString("dd/MM/yyyy")
+          $notas = @"
+          Executável para apresentação do sistema no Windows (não precisa de Python nem de internet).
+
+          **Instalador (recomendado):** baixe ``CursosLivres-Apresentacao-Instalador.exe``, abra e siga os passos. Cria um atalho na Área de Trabalho.
+          **Portátil:** baixe ``CursosLivres-Apresentacao-Portatil.zip``, extraia e abra ``Iniciar apresentacao.exe`` dentro da pasta.
+
+          Usuários (senha ``demo1234``): ``admin``, ``maria``, ``carlos``, ``aluno``.
+
+          Se o Windows mostrar "O Windows protegeu o computador", clique em "Mais informações" e em "Executar assim mesmo" (o programa não tem assinatura digital).
+
+          Versão do código: ${{ github.sha }}
+          "@
+          gh release create $tag `
+            dist/CursosLivres-Apresentacao-Instalador.exe `
+            dist/CursosLivres-Apresentacao-Portatil.zip `
+            --target "${{ github.sha }}" --title "Apresentação de $data" --notes $notas --latest
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          gh release list --limit 100 --json tagName --jq ".[].tagName" |
+            Where-Object { $_ -like "apresentacao-*" -and $_ -ne $tag } |
+            ForEach-Object { gh release delete $_ --cleanup-tag --yes }
